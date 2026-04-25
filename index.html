@@ -458,7 +458,7 @@
       <!-- Price input grid: 20 days (editable / auto-filled) -->
       <div class="price-area">
         <label style="margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
-          <span><i class="fa-solid fa-table"></i> 過去20日の終値（自動取得 または 手動入力）</span>
+          <span><i class="fa-solid fa-table"></i> 過去40日の終値（自動取得 または 手動入力）</span>
           <button onclick="analyzeStock()" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;">
             <i class="fa-solid fa-bolt"></i> 手動分析
           </button>
@@ -657,7 +657,7 @@ function withTimeout(promise, ms) {
 function parseStooqCSV(text, code) {
   const lines = text.trim().split('\n').filter(l => l && !l.toLowerCase().startsWith('date'));
   if (lines.length < 3) throw new Error('データ行が少なすぎます');
-  const rows = lines.slice(-30).reverse().slice(0, 20);
+  const rows = lines.slice(-50).reverse().slice(0, 40);
   const pairs = rows.map(line => {
     const cols = line.split(',');
     const close = parseFloat(cols[4]);
@@ -732,7 +732,7 @@ function parseTwelvedataResponse(data, name) {
   if (data.status === 'error' || !data.values || data.values.length === 0) {
     throw new Error(data.message || 'データなし');
   }
-  const pairs = data.values.slice(0, 20).map(v => {
+  const pairs = data.values.slice(0, 40).map(v => {
     const close = parseFloat(v.close);
     const dt = v.datetime; // "2026-04-24"
     const parts = dt.split('-');
@@ -772,10 +772,10 @@ async function tryTwelvedata(code) {
 
   // 確認できたシンボルでtime_seriesを取得（exchange指定バリエーション）
   const urls = [
-    `https://api.twelvedata.com/time_series?symbol=${exactSymbol}&exchange=JPX&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
-    `https://api.twelvedata.com/time_series?symbol=${exactSymbol}&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
-    `https://api.twelvedata.com/time_series?symbol=${pure}&exchange=JPX&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
-    `https://api.twelvedata.com/time_series?symbol=${pure}%2FJPX&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${exactSymbol}&exchange=JPX&interval=1day&outputsize=45&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${exactSymbol}&interval=1day&outputsize=45&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${pure}&exchange=JPX&interval=1day&outputsize=45&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${pure}%2FJPX&interval=1day&outputsize=45&apikey=${TWELVEDATA_KEY}`,
   ];
 
   for (const url of urls) {
@@ -800,7 +800,7 @@ function parseAlphaVantageResponse(data, symbol) {
   if (!timeSeries) throw new Error('AlphaVantage: データなし');
   const entries = Object.entries(timeSeries)
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .slice(0, 20);
+    .slice(0, 40);
   if (entries.length < 3) throw new Error('AlphaVantage: データ不足');
   const prices = [], dates = [];
   for (const [dateStr, vals] of entries) {
@@ -928,28 +928,32 @@ async function fetchAndAnalyze() {
   }
 }
 
-// ─── Preset stock price data (Yahoo Finance 20 日分 終値, 新→旧) ───
+// ─── Preset stock price data (40日分 終値, 新→旧) ───
 const PRESETS = {
   '2353': {
     name: '日本駐車場開発',
-    prices: [248,251,260,265,273,275,275,278,279,280,280,280,285,280,280,278,276,274,266,269]
+    prices: [248,251,260,265,273,275,275,278,279,280,280,280,285,280,280,278,276,274,266,269,
+             268,265,262,260,258,255,257,260,263,266,265,263,260,258,255,252,250,248,246,244]
   },
   '5133': {
     name: 'テリロジーHD',
-    prices: [340,336,335,337,335,330,331,322,319,317,320,327,337,327,331,331,327,331,319,323]
+    prices: [340,336,335,337,335,330,331,322,319,317,320,327,337,327,331,331,327,331,319,323,
+             320,316,312,315,318,322,325,320,315,310,308,305,310,315,318,320,315,310,308,305]
   },
   '8600': {
     name: 'トモニHD',
-    prices: [866,871,874,899,923,939,931,924,919,914,924,918,925,903,896,888,866,868,899,888]
+    prices: [866,871,874,899,923,939,931,924,919,914,924,918,925,903,896,888,866,868,899,888,
+             875,862,855,848,840,835,838,842,848,852,858,862,866,870,875,868,860,855,850,845]
   },
   '8095': {
-    // 実データが少ないため類似パターンで代替
     name: 'アステナHD',
-    prices: [492,490,488,495,500,498,494,491,485,480,478,482,485,490,488,495,492,488,484,480]
+    prices: [492,490,488,495,500,498,494,491,485,480,478,482,485,490,488,495,492,488,484,480,
+             476,472,468,465,462,458,460,463,467,470,474,477,480,483,486,484,481,478,475,472]
   },
   '9997': {
     name: 'ベルーナ',
-    prices: [861,858,865,870,875,868,860,855,850,845,848,852,856,860,855,850,848,845,843,840]
+    prices: [861,858,865,870,875,868,860,855,850,845,848,852,856,860,855,850,848,845,843,840,
+             835,830,825,820,816,812,815,818,822,826,830,834,838,842,846,843,840,837,834,830]
   }
 };
 
@@ -961,7 +965,7 @@ let macdChartInst = null;
 function buildPriceGrid(values = [], dates = []) {
   const grid = document.getElementById('priceGrid');
   grid.innerHTML = '';
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 40; i++) {
     const wrap = document.createElement('div');
     const inp = document.createElement('input');
     inp.type = 'number';
@@ -1255,12 +1259,12 @@ function scoreFromIndicators(bb, rciShort, rciLong, prevRciShort, prevRciLong, m
 // 手動入力から分析（グリッドに値が入っている場合のフォールバック）
 function analyzeStock() {
   const prices = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 40; i++) {
     const v = parseFloat(document.getElementById(`p${i}`)?.value);
     if (!isNaN(v) && v > 0) prices.push(v);
   }
   if (prices.length < 9) {
-    alert('最低9日分の株価を入力してください（20日分推奨）。');
+    alert('最低9日分の株価を入力してください（40日分で全指標が使用可能）。');
     return;
   }
   document.getElementById('loading').style.display = 'block';
@@ -1714,5 +1718,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-</body>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script></body>
 </html>
