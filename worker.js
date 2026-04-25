@@ -116,7 +116,7 @@ async function tryYahooFinance(pure) {
       const pairs = timestamps
         .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
         .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
-        .slice(-20)
+        .slice(-40)
         .reverse();
 
       if (pairs.length < 3) continue;
@@ -146,7 +146,7 @@ function parseStooqCSV(text, code) {
       return { success: false, message: `データ行不足(${dataLines.length}行)` };
     }
 
-    const recent = dataLines.slice(-30).reverse().slice(0, 20);
+    const recent = dataLines.slice(-50).reverse().slice(0, 40);
     const prices = [], dates = [];
 
     for (const line of recent) {
@@ -165,7 +165,8 @@ function parseStooqCSV(text, code) {
       return { success: false, message: `有効データ不足(${prices.length}件)` };
     }
 
-    return { success: true, prices, dates, count: prices.length, source: 'Stooq' };
+    // nameをコードから生成（Stooqはメタ情報を返さないのでコードをそのまま使用）
+    return { success: true, prices, dates, count: prices.length, source: 'Stooq', name: code.toUpperCase() };
   } catch (e) {
     return { success: false, message: `パースエラー: ${e.message}` };
   }
