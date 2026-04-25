@@ -713,37 +713,29 @@ function parseTwelvedataResponse(data, name) {
   };
 }
 
-// ① Twelvedata — 複数の symbol 形式を順番に試す
+// ① Twelvedata — JPX（東証正式取引所コード）で取得
 async function tryTwelvedata(code) {
-  const pure = code.replace(/\.[a-zA-Z]+$/, '').toUpperCase();
+  const pure = code.replace(/\.[a-zA-Z]+$/, '');
 
-  // Twelvedataが受け付ける東証銘柄のフォーマット候補
-  const candidates = [
-    `${pure}/TSE`,          // 例: 3739/TSE
-    `${pure}:TSE`,          // 例: 3739:TSE
-    `${pure}.TSE`,          // 例: 3739.TSE
-    `${pure}.T`,            // 例: 3739.T （一部対応）
-    pure,                   // 数字のみ（exchange=TSE と組み合わせ）
+  // Twelvedataでの東証正式表記: exchange=JPX
+  const urls = [
+    `https://api.twelvedata.com/time_series?symbol=${pure}&exchange=JPX&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${pure}&exchange=TSE&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${pure}&exchange=XJPX&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
+    `https://api.twelvedata.com/time_series?symbol=${pure}%2FJPX&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
   ];
 
-  for (const sym of candidates) {
+  for (const url of urls) {
     try {
-      // exchange パラメータ付きと無しの両方を試す
-      const urls = [
-        `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
-        `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(pure)}&exchange=TSE&interval=1day&outputsize=25&apikey=${TWELVEDATA_KEY}`,
-      ];
-      for (const url of urls) {
-        const res = await withTimeout(fetch(url, { cache: 'no-store' }), FETCH_TIMEOUT);
-        if (!res.ok) continue;
-        const data = await res.json();
-        if (data.status !== 'error' && data.values && data.values.length > 0) {
-          return parseTwelvedataResponse(data, pure);
-        }
+      const res = await withTimeout(fetch(url, { cache: 'no-store' }), FETCH_TIMEOUT);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.status !== 'error' && data.values && data.values.length > 0) {
+        return parseTwelvedataResponse(data, pure);
       }
     } catch(e) { /* 次を試す */ }
   }
-  throw new Error('Twelvedata: 全フォーマットで取得失敗');
+  throw new Error('Twelvedata: 取得失敗');
 }
 
 // メイン取得関数: Twelvedataを最優先に4段階で試す
