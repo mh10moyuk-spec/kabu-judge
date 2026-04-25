@@ -109,12 +109,22 @@ async function tryYahooFinance(pure) {
       const result = data?.chart?.result?.[0];
       if (!result) continue;
 
-      const closes     = result.indicators?.quote?.[0]?.close;
+      const quote      = result.indicators?.quote?.[0];
+      const closes     = quote?.close;
+      const opens_arr  = quote?.open;
+      const highs_arr  = quote?.high;
+      const lows_arr   = quote?.low;
       const timestamps = result.timestamp;
       if (!closes || !timestamps || closes.length < 3) continue;
 
       const pairs = timestamps
-        .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
+        .map((t, i) => ({
+          date:  new Date(t * 1000),
+          close: closes[i],
+          open:  opens_arr?.[i],
+          high:  highs_arr?.[i],
+          low:   lows_arr?.[i]
+        }))
         .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
         .slice(-40)
         .reverse();
@@ -125,6 +135,9 @@ async function tryYahooFinance(pure) {
       return {
         success: true,
         prices: pairs.map(p => p.close),
+        opens:  pairs.map(p => p.open  ?? p.close),
+        highs:  pairs.map(p => p.high  ?? p.close),
+        lows:   pairs.map(p => p.low   ?? p.close),
         dates:  pairs.map(p => `${p.date.getMonth()+1}/${p.date.getDate()}`),
         count:  pairs.length,
         source: `Yahoo(${ticker})`,
@@ -147,18 +160,24 @@ function parseStooqCSV(text, code) {
     }
 
     const recent = dataLines.slice(-50).reverse().slice(0, 40);
-    const prices = [], dates = [];
+    const prices = [], dates = [], opens = [], highs = [], lows = [];
 
     for (const line of recent) {
       const cols = line.split(',');
       if (cols.length < 5) continue;
       const dateStr  = cols[0].trim();
+      const openVal  = parseFloat(cols[1].trim());
+      const highVal  = parseFloat(cols[2].trim());
+      const lowVal   = parseFloat(cols[3].trim());
       const closeVal = parseFloat(cols[4].trim());
       if (!dateStr || isNaN(closeVal) || closeVal <= 0) continue;
       const parts = dateStr.split('-');
       const label = parts.length >= 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : dateStr;
       prices.push(closeVal);
       dates.push(label);
+      opens.push(isNaN(openVal)  ? closeVal : openVal);
+      highs.push(isNaN(highVal)  ? closeVal : highVal);
+      lows.push(isNaN(lowVal)   ? closeVal : lowVal);
     }
 
     if (prices.length < 3) {
@@ -166,7 +185,7 @@ function parseStooqCSV(text, code) {
     }
 
     // nameをコードから生成（Stooqはメタ情報を返さないのでコードをそのまま使用）
-    return { success: true, prices, dates, count: prices.length, source: 'Stooq', name: code.toUpperCase() };
+    return { success: true, prices, dates, opens, highs, lows, count: prices.length, source: 'Stooq', name: code.toUpperCase() };
   } catch (e) {
     return { success: false, message: `パースエラー: ${e.message}` };
   }
