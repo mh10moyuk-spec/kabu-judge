@@ -318,19 +318,25 @@
     .trade-note  { font-size: 10px; color: var(--text-muted); line-height: 1.4; }
 
     /* ─── Forecast ─── */
-    .forecast-main { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding: 14px; background: rgba(255,255,255,0.03); border-radius: 12px; }
-    .forecast-icon { font-size: 48px; line-height: 1; }
-    .forecast-label { font-size: 24px; font-weight: 800; color: var(--text); }
-    .forecast-bars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-    .forecast-bar-row { display: flex; align-items: center; gap: 10px; }
-    .fb-label { font-size: 13px; min-width: 72px; font-weight: 500; }
-    .fb-track { flex: 1; height: 16px; background: rgba(255,255,255,0.06); border-radius: 8px; overflow: hidden; }
-    .fb-fill  { height: 100%; border-radius: 8px; transition: width 0.7s cubic-bezier(.4,0,.2,1); }
-    .fb-fill.up   { background: linear-gradient(90deg, #16a34a, #22c55e); }
-    .fb-fill.flat { background: linear-gradient(90deg, #4f46e5, #818cf8); }
-    .fb-fill.down { background: linear-gradient(90deg, #dc2626, #ef4444); }
-    .fb-pct { font-size: 15px; font-weight: 800; min-width: 40px; text-align: right; }
-    .forecast-reason { font-size: 12px; color: var(--text-muted); line-height: 1.7; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid var(--border); }
+    .forecast-body { display: flex; align-items: center; gap: 20px; padding: 4px 0 12px; }
+    .forecast-chart-wrap { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
+    .forecast-chart-wrap canvas { width: 140px !important; height: 140px !important; }
+    .forecast-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none; }
+    .forecast-center-icon  { font-size: 28px; line-height: 1; }
+    .forecast-center-pct   { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.1; }
+    .forecast-center-label { font-size: 10px; color: var(--text-muted); }
+    .forecast-legend { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+    .forecast-legend-row { display: flex; align-items: center; gap: 10px; }
+    .fl-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .fl-dot.up   { background: #22c55e; }
+    .fl-dot.flat { background: #818cf8; }
+    .fl-dot.down { background: #ef4444; }
+    .fl-name { font-size: 13px; color: var(--text-muted); flex: 1; }
+    .fl-pct  { font-size: 16px; font-weight: 800; min-width: 44px; text-align: right; }
+    .fl-pct.up   { color: #22c55e; }
+    .fl-pct.flat { color: #818cf8; }
+    .fl-pct.down { color: #ef4444; }
+    .forecast-reason { font-size: 12px; color: var(--text-muted); line-height: 1.7; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid var(--border); margin-top: 12px; }
 
     /* ─── Tabs ─── */
     .tab-bar {
@@ -401,7 +407,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.1 - 手動入力廃止・UI整理</p>
+<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.2 - 予想ドーナツチャート</p>
 </header>
 
 <main>
@@ -618,32 +624,37 @@
       </div>
     </div>
 
-    <!-- 🔮 明日の動き予想カード -->
+    <!-- 明日の動き予想カード -->
     <div class="card" id="forecastCard" style="display:none;">
       <div class="card-header"><i class="fa-solid fa-wand-magic-sparkles"></i> 明日の動き予想</div>
       <div class="card-body">
-        <div class="forecast-main">
-          <div class="forecast-icon" id="forecastIcon">–</div>
-          <div>
-            <div style="font-size:12px; color:var(--text-muted); margin-bottom:2px;">総合判断</div>
-            <div class="forecast-label" id="forecastLabel">–</div>
+        <div class="forecast-body">
+          <!-- ドーナツチャート -->
+          <div class="forecast-chart-wrap">
+            <canvas id="forecastChart"></canvas>
+            <div class="forecast-center">
+              <div class="forecast-center-icon"  id="forecastIcon">–</div>
+              <div class="forecast-center-pct"   id="forecastTopPct">–</div>
+              <div class="forecast-center-label" id="forecastTopLabel">–</div>
+            </div>
           </div>
-        </div>
-        <div class="forecast-bars">
-          <div class="forecast-bar-row">
-            <span class="fb-label">📈 上昇</span>
-            <div class="fb-track"><div class="fb-fill up" id="probUp" style="width:33%"></div></div>
-            <span class="fb-pct" id="probUpTxt">33%</span>
-          </div>
-          <div class="forecast-bar-row">
-            <span class="fb-label">➡️ 横ばい</span>
-            <div class="fb-track"><div class="fb-fill flat" id="probFlat" style="width:34%"></div></div>
-            <span class="fb-pct" id="probFlatTxt">34%</span>
-          </div>
-          <div class="forecast-bar-row">
-            <span class="fb-label">📉 下落</span>
-            <div class="fb-track"><div class="fb-fill down" id="probDown" style="width:33%"></div></div>
-            <span class="fb-pct" id="probDownTxt">33%</span>
+          <!-- 凡例 -->
+          <div class="forecast-legend">
+            <div class="forecast-legend-row">
+              <div class="fl-dot up"></div>
+              <span class="fl-name">上昇</span>
+              <span class="fl-pct up" id="probUpTxt">33%</span>
+            </div>
+            <div class="forecast-legend-row">
+              <div class="fl-dot flat"></div>
+              <span class="fl-name">横ばい</span>
+              <span class="fl-pct flat" id="probFlatTxt">34%</span>
+            </div>
+            <div class="forecast-legend-row">
+              <div class="fl-dot down"></div>
+              <span class="fl-name">下落</span>
+              <span class="fl-pct down" id="probDownTxt">33%</span>
+            </div>
           </div>
         </div>
         <div class="forecast-reason" id="forecastReason">–</div>
@@ -1015,6 +1026,7 @@ const PRESETS = {
 };
 
 let priceChartInst = null;
+let forecastChartInst = null;
 let rciChartInst = null;
 let macdChartInst = null;
 
@@ -1702,83 +1714,92 @@ function calcForecast(bb, rciShort, rciLong, macd, prices) {
   const card = document.getElementById('forecastCard');
   card.style.display = 'block';
 
-  // スコアベースで上昇・下落・横ばい確率を算出
   let upScore = 0, downScore = 0;
 
-  // BB
   if (bb) {
     const sig = bb.sigmaPos;
     if (sig <= -2) upScore += 30;
     else if (sig <= -1) upScore += 15;
     else if (sig >= 2) downScore += 30;
     else if (sig >= 1) downScore += 15;
-    // スクイーズ → どちらにも振れやすい
     const bw = (bb.upper2 - bb.lower2) / bb.mid * 100;
     if (bw < 3) { upScore += 5; downScore += 5; }
   }
-
-  // RCI短期
   if (rciShort !== null) {
     if (rciShort <= -80) upScore += 25;
     else if (rciShort <= -50) upScore += 10;
     else if (rciShort >= 80) downScore += 25;
     else if (rciShort >= 50) downScore += 10;
   }
-
-  // RCI長期
   if (rciLong !== null) {
     if (rciLong <= -50) upScore += 10;
     else if (rciLong >= 50) downScore += 10;
   }
-
-  // MACD ヒストグラム方向
   if (macd && macd.hist !== null && macd.prevHist !== null) {
     if (macd.hist > macd.prevHist) upScore += 15;
     else downScore += 15;
   }
-
-  // 直近3日の値動き（モメンタム）
   if (prices.length >= 4) {
     const mom3 = prices[0] - prices[3];
     if (mom3 > 0) upScore += 10;
     else if (mom3 < 0) downScore += 10;
   }
 
-  // 確率に変換（合計100%）
-  const total = upScore + downScore + 40; // 40を横ばいのベース
-  let probUp   = Math.round(upScore / total * 100);
-  let probDown = Math.round(downScore / total * 100);
-  let probFlat = 100 - probUp - probDown;
-  // 0以下にならないように
-  probFlat = Math.max(5, probFlat);
-  probUp   = Math.max(5, probUp);
-  probDown = Math.max(5, probDown);
-  // 合計を100に正規化
+  const total = upScore + downScore + 40;
+  let probUp   = Math.max(5, Math.round(upScore   / total * 100));
+  let probDown = Math.max(5, Math.round(downScore  / total * 100));
+  let probFlat = Math.max(5, 100 - probUp - probDown);
   const sum = probUp + probFlat + probDown;
-  probUp   = Math.round(probUp / sum * 100);
+  probUp   = Math.round(probUp   / sum * 100);
   probDown = Math.round(probDown / sum * 100);
   probFlat = 100 - probUp - probDown;
 
-  // 最大確率の方向
-  let icon, label, labelColor;
+  // 最大確率
+  let topIcon, topLabel, topPct, topColor;
   if (probUp >= probDown && probUp >= probFlat) {
-    icon = '📈'; label = '上昇優勢'; labelColor = 'var(--green)';
+    topIcon = '📈'; topLabel = '上昇優勢'; topPct = probUp;   topColor = '#22c55e';
   } else if (probDown >= probUp && probDown >= probFlat) {
-    icon = '📉'; label = '下落優勢'; labelColor = 'var(--red)';
+    topIcon = '📉'; topLabel = '下落優勢'; topPct = probDown; topColor = '#ef4444';
   } else {
-    icon = '➡️'; label = '横ばい優勢'; labelColor = 'var(--accent2)';
+    topIcon = '➡️'; topLabel = '横ばい優勢'; topPct = probFlat; topColor = '#818cf8';
   }
 
-  document.getElementById('forecastIcon').textContent   = icon;
-  document.getElementById('forecastLabel').textContent  = label;
-  document.getElementById('forecastLabel').style.color  = labelColor;
+  // ドーナツチャート中心テキスト
+  document.getElementById('forecastIcon').textContent      = topIcon;
+  document.getElementById('forecastTopPct').textContent    = topPct + '%';
+  document.getElementById('forecastTopLabel').textContent  = topLabel;
 
-  document.getElementById('probUp').style.width    = probUp + '%';
-  document.getElementById('probFlat').style.width  = probFlat + '%';
-  document.getElementById('probDown').style.width  = probDown + '%';
-  document.getElementById('probUpTxt').textContent   = probUp + '%';
+  // 凡例テキスト
+  document.getElementById('probUpTxt').textContent   = probUp   + '%';
   document.getElementById('probFlatTxt').textContent = probFlat + '%';
   document.getElementById('probDownTxt').textContent = probDown + '%';
+
+  // ドーナツチャート描画
+  if (forecastChartInst) forecastChartInst.destroy();
+  const fCtx = document.getElementById('forecastChart').getContext('2d');
+  forecastChartInst = new Chart(fCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['上昇', '横ばい', '下落'],
+      datasets: [{
+        data: [probUp, probFlat, probDown],
+        backgroundColor: ['#22c55e', '#818cf8', '#ef4444'],
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: false,
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}%` }
+        }
+      },
+      animation: { duration: 700 }
+    }
+  });
 
   // 理由テキスト
   const reasons = [];
@@ -1787,12 +1808,11 @@ function calcForecast(bb, rciShort, rciLong, macd, prices) {
   if (rciShort !== null && rciShort <= -80) reasons.push('RCI短期が-80以下（底値圏）');
   if (rciShort !== null && rciShort >= 80)  reasons.push('RCI短期が+80以上（過熱圏）');
   if (macd && macd.hist !== null && macd.prevHist !== null) {
-    if (macd.hist > macd.prevHist) reasons.push('MACDヒストグラムが拡大中（買いモメンタム）');
-    else reasons.push('MACDヒストグラムが縮小中（売りモメンタム）');
+    reasons.push(macd.hist > macd.prevHist ? 'MACDヒストグラム拡大（買いモメンタム）' : 'MACDヒストグラム縮小（売りモメンタム）');
   }
   if (prices.length >= 4) {
     const mom = prices[0] - prices[3];
-    reasons.push(`直近3日の値動き: ${mom > 0 ? '+' : ''}${Math.round(mom)}円`);
+    reasons.push(`直近3日: ${mom > 0 ? '+' : ''}${Math.round(mom)}円`);
   }
   document.getElementById('forecastReason').textContent =
     reasons.length ? reasons.join('　/　') : '判断材料が不足しています';
