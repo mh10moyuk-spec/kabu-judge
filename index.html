@@ -397,7 +397,8 @@
 
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
-  <p>ボリンジャーバンド × RCI で判定 | Yahoo Finance から株価を自動取得</p>
+  <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
+<p style="font-size:11px; background:#818cf8; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🚀 v3.0 - BB+RCI+MACD+MA25対応</p>
 </header>
 
 <main>
@@ -519,6 +520,20 @@
             <div class="ind-bar"><div class="ind-bar-fill" id="rciLongBar" style="width:50%; background: var(--red);"></div></div>
             <div class="ind-status" id="rciLongStatus" style="color: var(--text-muted);">–</div>
           </div>
+          <!-- MACD -->
+          <div class="indicator-card">
+            <div class="ind-name">MACD</div>
+            <div class="ind-val" id="macdVal">–</div>
+            <div class="ind-bar"><div class="ind-bar-fill" id="macdBar" style="width:50%; background: var(--accent);"></div></div>
+            <div class="ind-status" id="macdStatus" style="color: var(--text-muted);">–</div>
+          </div>
+          <!-- MA25 -->
+          <div class="indicator-card">
+            <div class="ind-name">25日移動平均線</div>
+            <div class="ind-val" id="ma25Val">–</div>
+            <div class="ind-bar"><div class="ind-bar-fill" id="ma25Bar" style="width:50%; background: var(--yellow);"></div></div>
+            <div class="ind-status" id="ma25Status" style="color: var(--text-muted);">–</div>
+          </div>
         </div>
 
         <!-- BB Position bar visualization -->
@@ -540,6 +555,7 @@
       <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('tab-price', this)">価格チャート</button>
         <button class="tab-btn" onclick="switchTab('tab-rci', this)">RCIチャート</button>
+        <button class="tab-btn" onclick="switchTab('tab-macd', this)">MACDチャート</button>
         <button class="tab-btn" onclick="switchTab('tab-signals', this)">シグナル詳細</button>
       </div>
 
@@ -559,6 +575,18 @@
           <span style="color: var(--accent2);">■</span> RCI 短期（9日）　
           <span style="color: var(--green);">■</span> RCI 長期（26日）　
           点線: ±80（過熱ライン）
+        </div>
+      </div>
+
+      <!-- Tab: MACD chart -->
+      <div class="tab-pane" id="tab-macd">
+        <div class="chart-container-rci" style="margin-bottom: 8px;">
+          <canvas id="macdChart"></canvas>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); padding: 0 4px;">
+          <span style="color: var(--accent2);">■</span> MACD線　
+          <span style="color: var(--yellow);">■</span> シグナル線　
+          <span style="color: var(--green);">■</span> ヒストグラム（正=買い優勢）
         </div>
       </div>
 
@@ -605,19 +633,18 @@
 
 <script>
 // ══════════════════════════════════════════════════════════════
-//  株価自動取得 — 6段階フォールバック方式
-//  ① Cloudflare Worker → Yahoo Finance（全銘柄対応・最優先）
-//  ② Twelvedata（exchange=JPX / symbol_search補完）
-//  ③ Alpha Vantage（symbol=7203.T 形式、CORS完全対応）
-//  ④ Stooq直接 (CORS対応)
-//  ⑤ allorigins.win → Stooq
-//  ⑥ corsproxy.io → Yahoo Finance v8
+//  株価自動取得 — 5段階フォールバック方式（使える回数が多い順）
+//  ① Cloudflare Worker → Stooq CSV（無制限・最優先）
+//  ② Stooq直接（CORS環境のみ・無制限）
+//  ③ allorigins.win → Stooq（無制限）
+//  ④ Twelvedata（800回/日）
+//  ⑤ Alpha Vantage（25回/日）
 // ══════════════════════════════════════════════════════════════
 
 const TWELVEDATA_KEY   = '1fe3e8dc756f4c13a4b2e0e2bab361e8';
 const ALPHAVANTAGE_KEY = 'WLTMIFFR3K49VBF5';
-const CF_WORKER_URL    = 'https://kabu-proxy.mh10moyuk.workers.dev/';
-const FETCH_TIMEOUT    = 12000; // 12秒タイムアウト
+const CF_WORKER_URL    = 'https://kabu-proxy.mh10moyuk.workers.dev';
+const FETCH_TIMEOUT    = 15000; // 15秒タイムアウト
 
 function withTimeout(promise, ms) {
   return Promise.race([
@@ -648,49 +675,30 @@ function parseStooqCSV(text, code) {
   };
 }
 
-// ① Cloudflare Worker → Yahoo Finance（全銘柄・名証・東証・大証対応）
-async function tryCFWorkerYahoo(code) {
+// ① Cloudflare Worker → Stooq CSV（最優先・全銘柄対応・無制限）
+async function tryCFWorkerStooq(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
-  // 東証→名証→大証→札証の順で試す
-  const suffixes = ['.T', '.N', '.O', '.S'];
-  for (const suffix of suffixes) {
-    try {
-      const ticker = pure + suffix;
-      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=3mo`;
-      const proxyUrl = `${CF_WORKER_URL}?url=${encodeURIComponent(yahooUrl)}`;
-      const res = await withTimeout(fetch(proxyUrl, { cache: 'no-store' }), FETCH_TIMEOUT);
-      if (!res.ok) continue;
-      const data = await res.json();
-      const result = data?.chart?.result?.[0];
-      if (!result) continue;
-      const closes = result.indicators?.quote?.[0]?.close;
-      const timestamps = result.timestamp;
-      if (!closes || !timestamps || closes.length < 3) continue;
-      const pairs = timestamps
-        .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
-        .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
-        .slice(-20).reverse();
-      if (pairs.length < 3) continue;
-      const name = result.meta?.longName || result.meta?.shortName || ticker;
-      return {
-        prices: pairs.map(p => p.close),
-        dates:  pairs.map(p => `${p.date.getMonth()+1}/${p.date.getDate()}`),
-        name
-      };
-    } catch(e) { /* 次を試す */ }
-  }
-  throw new Error('CFWorker→Yahoo: 全サフィックス失敗');
+  const workerUrl = `${CF_WORKER_URL}/?code=${encodeURIComponent(pure)}`;
+  const res = await withTimeout(fetch(workerUrl, { cache: 'no-store' }), FETCH_TIMEOUT);
+  if (!res.ok) throw new Error(`Worker HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Worker取得失敗');
+  if (!data.prices || data.prices.length < 3) throw new Error('Workerデータ不足');
+  return {
+    prices: data.prices,
+    dates:  data.dates || [],
+    name:   pure
+  };
 }
 
-// ② Stooq 直接（CORSヘッダーあり環境なら通る）— .jp / .nj（名証）を試す
+// ② Stooq 直接（CORS環境のみ・無制限）
 async function tryStooqDirect(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
-  // 東証→名証→大証の順で試す
-  const suffixes = ['.jp', '.nj', '.fj'];
+  const suffixes = ['.jp', '.nj', '.oj', '.fj'];
   for (const suffix of suffixes) {
     try {
       const url = `https://stooq.com/q/d/l/?s=${pure}${suffix}&i=d`;
-      const res = await withTimeout(fetch(url, { cache: 'no-store', mode: 'cors' }), FETCH_TIMEOUT);
+      const res = await withTimeout(fetch(url, { cache: 'no-store', mode: 'cors' }), 8000);
       if (!res.ok) continue;
       const text = await res.text();
       if (text.includes('<html') || text.length < 30) continue;
@@ -700,15 +708,15 @@ async function tryStooqDirect(code) {
   throw new Error('Stooq直接: 全サフィックス失敗');
 }
 
-// ② allorigins.win → Stooq（.jp / .nj を試す）
+// ③ allorigins.win → Stooq（無制限）
 async function tryAlloriginsStooq(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
-  const suffixes = ['.jp', '.nj', '.fj'];
+  const suffixes = ['.jp', '.nj', '.oj', '.fj'];
   for (const suffix of suffixes) {
     try {
       const target = `https://stooq.com/q/d/l/?s=${pure}${suffix}&i=d`;
       const url = `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`;
-      const res = await withTimeout(fetch(url, { cache: 'no-store' }), FETCH_TIMEOUT);
+      const res = await withTimeout(fetch(url, { cache: 'no-store' }), 10000);
       if (!res.ok) continue;
       const json = await res.json();
       const text = json.contents;
@@ -717,31 +725,6 @@ async function tryAlloriginsStooq(code) {
     } catch(e) { /* 次を試す */ }
   }
   throw new Error('AllOrigins→Stooq: 全サフィックス失敗');
-}
-
-// ③ corsproxy.io → Yahoo Finance Chart API
-async function tryCorsproxyYahoo(code) {
-  const ticker = code.includes('.') ? code.toUpperCase() : code.toUpperCase() + '.T';
-  const yUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2mo&events=history`;
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yUrl)}`;
-  const res = await withTimeout(fetch(proxyUrl, { cache: 'no-store' }), FETCH_TIMEOUT);
-  if (!res.ok) throw new Error(`corsproxy HTTP ${res.status}`);
-  const data = await res.json();
-  const result = data?.chart?.result?.[0];
-  if (!result) throw new Error('Yahooチャートデータなし');
-  const closes = result.indicators?.quote?.[0]?.close;
-  const timestamps = result.timestamp;
-  if (!closes || !timestamps) throw new Error('Yahoo終値データなし');
-  const pairs = timestamps
-    .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
-    .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
-    .slice(-20).reverse();
-  if (pairs.length < 3) throw new Error('Yahoo有効データ不足');
-  return {
-    prices: pairs.map(p => p.close),
-    dates:  pairs.map(p => `${p.date.getMonth()+1}/${p.date.getDate()}`),
-    name:   ticker
-  };
 }
 
 // Twelvedataのレスポンスをパースして返す共通関数
@@ -764,7 +747,7 @@ function parseTwelvedataResponse(data, name) {
   };
 }
 
-// ① Twelvedata — symbol_searchで正しいシンボルを特定してから取得
+// ④ Twelvedata（800回/日）
 async function tryTwelvedata(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
 
@@ -808,7 +791,7 @@ async function tryTwelvedata(code) {
   throw new Error('Twelvedata: 取得失敗');
 }
 
-// Alpha Vantageのレスポンスをパースする共通関数
+// Alpha Vantageのレスポンスをパース
 function parseAlphaVantageResponse(data, symbol) {
   if (data['Error Message']) throw new Error(`AlphaVantage: ${data['Error Message']}`);
   if (data['Note']) throw new Error('AlphaVantage: APIレート制限');
@@ -831,7 +814,7 @@ function parseAlphaVantageResponse(data, symbol) {
   return { prices, dates, name: symbol };
 }
 
-// ② Alpha Vantage — 東証(.T) / 名証(.N) / 大証(.O) を順に試す
+// ⑤ Alpha Vantage（25回/日）
 async function tryAlphaVantage(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
   // 東証→名証→大証→プレフィックスなし の順で試す
@@ -857,16 +840,15 @@ async function tryAlphaVantage(code) {
   throw new Error('AlphaVantage: 全シンボル取得失敗');
 }
 
-// メイン取得関数: Twelvedata → AlphaVantage → Stooq → AllOrigins → Corsproxy の5段階
+// メイン取得関数: Worker→Stooq直接→AllOrigins→Twelvedata→AlphaVantage の5段階
 async function fetchPrices(code) {
   const loadMsg = document.getElementById('loadingMsg');
   const funcs = [
-    { name: 'Yahoo(自動取得)', fn: tryCFWorkerYahoo   },
-    { name: 'Twelvedata',      fn: tryTwelvedata      },
-    { name: 'Alpha Vantage',   fn: tryAlphaVantage    },
-    { name: 'Stooq直接',       fn: tryStooqDirect     },
-    { name: 'AllOrigins→Stooq',fn: tryAlloriginsStooq },
-    { name: 'Corsproxy→Yahoo', fn: tryCorsproxyYahoo  },
+    { name: 'Worker→Stooq',    fn: tryCFWorkerStooq   },
+    { name: 'Stooq直接',        fn: tryStooqDirect     },
+    { name: 'AllOrigins→Stooq', fn: tryAlloriginsStooq },
+    { name: 'Twelvedata',       fn: tryTwelvedata      },
+    { name: 'Alpha Vantage',    fn: tryAlphaVantage    },
   ];
   const errs = [];
   for (const { name, fn } of funcs) {
@@ -973,6 +955,7 @@ const PRESETS = {
 
 let priceChartInst = null;
 let rciChartInst = null;
+let macdChartInst = null;
 
 // ─── Build price input grid ───
 function buildPriceGrid(values = [], dates = []) {
@@ -1069,77 +1052,197 @@ function calcRCISeries(prices, period) {
   return result; // index 0 = most recent
 }
 
+// ─── EMA (Exponential Moving Average) ───
+// prices: newest→oldest, returns array newest→oldest
+function calcEMA(prices, period) {
+  if (prices.length < period) return null;
+  const reversed = [...prices].reverse(); // oldest→newest
+  const k = 2 / (period + 1);
+  const result = [];
+  let ema = reversed.slice(0, period).reduce((a, b) => a + b, 0) / period; // SMA seed
+  result.push(ema);
+  for (let i = period; i < reversed.length; i++) {
+    ema = reversed[i] * k + ema * (1 - k);
+    result.push(ema);
+  }
+  // result is oldest→newest, pad front with nulls for skipped items, then reverse
+  const padded = new Array(period - 1).fill(null).concat(result);
+  return padded.reverse(); // newest→oldest
+}
+
+// ─── MACD ───
+// prices: newest→oldest
+// returns { macd, signal, hist, prevMacd, prevSignal, prevHist, series }
+function calcMACD(prices, fast = 12, slow = 26, sigPeriod = 9) {
+  if (prices.length < slow + sigPeriod) return null;
+  const emaFast = calcEMA(prices, fast);   // newest→oldest, may have nulls
+  const emaSlow = calcEMA(prices, slow);
+  if (!emaFast || !emaSlow) return null;
+  // MACD line (newest→oldest), only where both EMAs are valid
+  const macdLine = emaFast.map((v, i) => (v !== null && emaSlow[i] !== null) ? v - emaSlow[i] : null);
+  // Signal: EMA of macdLine (use non-null portion)
+  const firstValid = macdLine.findIndex(v => v !== null);
+  if (firstValid < 0) return null;
+  const macdNonNull = macdLine.slice(firstValid); // newest valid → oldest valid (no nulls)
+  const sigArr = calcEMA(macdNonNull.filter(v => v !== null), sigPeriod);
+  if (!sigArr) return null;
+  // Re-align sigArr to macdLine length
+  const sigAligned = new Array(firstValid).fill(null).concat(sigArr);
+  const hist = macdLine.map((v, i) => (v !== null && sigAligned[i] !== null) ? v - sigAligned[i] : null);
+  return {
+    macd:       macdLine[0],
+    signal:     sigAligned[0],
+    hist:       hist[0],
+    prevMacd:   macdLine[1],
+    prevSignal: sigAligned[1],
+    prevHist:   hist[1],
+    series: { macd: macdLine, signal: sigAligned, hist }
+  };
+}
+
+// ─── Moving Average ───
+// prices: newest→oldest, returns MA value or null
+function calcMA(prices, period) {
+  if (prices.length < period) return null;
+  return mean(prices.slice(0, period));
+}
+
+// MA series for chart (newest→oldest)
+function calcMASeries(prices, period) {
+  const result = [];
+  for (let i = 0; i <= prices.length - period; i++) {
+    result.push(mean(prices.slice(i, i + period)));
+  }
+  const padded = new Array(period - 1).fill(null).concat(result);
+  return padded; // newest→oldest
+}
+
 // ─── Scoring ───
-function scoreFromBBRCI(bb, rciShort, rciLong, prevRciShort, prevRciLong) {
+function scoreFromIndicators(bb, rciShort, rciLong, prevRciShort, prevRciLong, macd, ma25, curPrice) {
   let score = 50; // neutral start
   const signals = [];
 
-  // ── BB signals ──
+  // ══ ① BB シグナル（最大±15点）══
   const sig = bb.sigmaPos;
+  const bandWidth = (bb.upper2 - bb.lower2) / bb.mid * 100;
 
   if (sig <= -2) {
-    score += 20;
+    score += 15;
     signals.push({ type: 'pos', title: '📉 BBバンド -2σ以下', desc: `現在値 ${bb.cur.toFixed(0)}円 は下限-2σ(${bb.lower2.toFixed(0)}円)以下。統計的に売られすぎの水準。` });
   } else if (sig <= -1) {
-    score += 10;
+    score += 7;
     signals.push({ type: 'pos', title: '📉 BB -1σ付近', desc: `下バンド-1σ(${bb.lower1.toFixed(0)}円)付近。一定の割安圏。` });
   } else if (sig >= 2) {
-    score -= 20;
+    score -= 15;
     signals.push({ type: 'neg', title: '📈 BBバンド +2σ以上', desc: `現在値 ${bb.cur.toFixed(0)}円 は上限+2σ(${bb.upper2.toFixed(0)}円)以上。過熱・反落リスク。` });
   } else if (sig >= 1) {
-    score -= 8;
+    score -= 7;
     signals.push({ type: 'neg', title: '📈 BB +1σ付近', desc: `上バンド+1σ(${bb.upper1.toFixed(0)}円)付近。やや過熱気味。` });
   } else {
     signals.push({ type: 'neu', title: '📊 BB 中心付近', desc: `現在値 ${bb.cur.toFixed(0)}円 は移動平均(${bb.mid.toFixed(0)}円)近辺。方向感を見極める局面。` });
   }
 
-  // BB width (squeeze detection)
-  const bandWidth = (bb.upper2 - bb.lower2) / bb.mid * 100;
+  // BB スクイーズ
   if (bandWidth < 3) {
-    score += 5; // potential breakout incoming
+    score += 3;
     signals.push({ type: 'pos', title: '🔵 BBスクイーズ（収縮）', desc: `バンド幅 ${bandWidth.toFixed(1)}%。ボラティリティが収縮中。大きな動きの前兆の可能性。` });
   } else if (bandWidth > 10) {
     signals.push({ type: 'neu', title: '🟡 BBエクスパンション', desc: `バンド幅 ${bandWidth.toFixed(1)}%。ボラティリティが拡大中。強いトレンドが出ている局面。` });
   }
 
-  // ── RCI signals ──
+  // ══ ② RCI シグナル（最大±20点）══
   if (rciShort !== null) {
-    if (rciShort <= -80 && prevRciShort > rciShort) {
-      score += 22;
-      signals.push({ type: 'pos', title: '🟢 RCI短期 -80以下から反転', desc: `RCI短期 ${rciShort.toFixed(1)}。売られすぎ圏から上向き。強い買いシグナル。` });
-    } else if (rciShort <= -80) {
-      score += 12;
-      signals.push({ type: 'pos', title: '🟢 RCI短期 -80以下（売られすぎ）', desc: `RCI短期 ${rciShort.toFixed(1)}。売られすぎの水準。反転を待つ局面。` });
-    } else if (rciShort >= 80 && prevRciShort < rciShort) {
-      score -= 20;
-      signals.push({ type: 'neg', title: '🔴 RCI短期 +80以上（買われすぎ）', desc: `RCI短期 ${rciShort.toFixed(1)}。過熱圏継続。利確・反落に注意。` });
+    if (rciShort <= -80) {
+      const turning = prevRciShort !== null && prevRciShort < rciShort;
+      score += turning ? 18 : 10;
+      signals.push({ type: 'pos', title: turning ? '🟢 RCI短期 -80から反転↑' : '🟢 RCI短期 -80以下（売られすぎ）',
+        desc: `RCI短期 ${rciShort.toFixed(1)}。${turning ? '売られすぎ圏から上向き。強い買いシグナル。' : '売られすぎの水準。反転を待つ局面。'}` });
     } else if (rciShort >= 80) {
-      score -= 12;
-      signals.push({ type: 'neg', title: '🔴 RCI短期 +80超え', desc: `RCI短期 ${rciShort.toFixed(1)}。買われすぎの水準に達した。` });
+      const continuing = prevRciShort !== null && prevRciShort <= rciShort;
+      score -= continuing ? 18 : 10;
+      signals.push({ type: 'neg', title: continuing ? '🔴 RCI短期 +80以上継続（過熱）' : '🔴 RCI短期 +80超え',
+        desc: `RCI短期 ${rciShort.toFixed(1)}。${continuing ? '過熱圏継続。利確・反落に注意。' : '買われすぎの水準に達した。'}` });
     }
   }
 
-  if (rciLong !== null) {
+  if (rciLong !== null && rciShort !== null) {
     if (rciLong <= -50 && rciShort > rciLong) {
-      score += 15;
+      score += 10;
       signals.push({ type: 'pos', title: '🌟 RCI GC候補（-50以下エリア）', desc: `長期RCI ${rciLong.toFixed(1)}の低位で短期が長期を上回る。ゴールデンクロス候補。` });
     } else if (rciLong >= 50 && rciShort < rciLong) {
-      score -= 15;
+      score -= 10;
       signals.push({ type: 'neg', title: '⚠️ RCI DC候補（+50以上エリア）', desc: `長期RCI ${rciLong.toFixed(1)}の高位で短期が長期を下回る。デッドクロス候補。` });
     }
   }
 
-  // Cross detection
   if (rciShort !== null && rciLong !== null && prevRciShort !== null && prevRciLong !== null) {
-    const crossedUp = prevRciShort <= prevRciLong && rciShort > rciLong;
+    const crossedUp   = prevRciShort <= prevRciLong && rciShort > rciLong;
     const crossedDown = prevRciShort >= prevRciLong && rciShort < rciLong;
     if (crossedUp) {
-      score += 18;
+      score += 15;
       signals.push({ type: 'pos', title: '✨ RCI ゴールデンクロス！', desc: `短期RCI(${rciShort.toFixed(1)})が長期RCI(${rciLong.toFixed(1)})を下から上に抜けた。強い買いシグナル。` });
     }
     if (crossedDown) {
-      score -= 18;
+      score -= 15;
       signals.push({ type: 'neg', title: '💀 RCI デッドクロス！', desc: `短期RCI(${rciShort.toFixed(1)})が長期RCI(${rciLong.toFixed(1)})を上から下に抜けた。売りシグナル。` });
+    }
+  }
+
+  // ══ ③ MACD シグナル（最大±15点）══
+  if (macd !== null && macd.macd !== null && macd.signal !== null) {
+    const prevHist = macd.prevHist;
+    const curHist  = macd.hist;
+    // MACD vs Signal クロス
+    if (macd.prevMacd !== null && macd.prevSignal !== null) {
+      const gcMacd = macd.prevMacd <= macd.prevSignal && macd.macd > macd.signal;
+      const dcMacd = macd.prevMacd >= macd.prevSignal && macd.macd < macd.signal;
+      if (gcMacd) {
+        score += 15;
+        signals.push({ type: 'pos', title: '✨ MACD ゴールデンクロス！', desc: `MACD線(${macd.macd.toFixed(2)})がシグナル線(${macd.signal.toFixed(2)})を上抜け。買いトレンド転換シグナル。` });
+      } else if (dcMacd) {
+        score -= 15;
+        signals.push({ type: 'neg', title: '💀 MACD デッドクロス！', desc: `MACD線(${macd.macd.toFixed(2)})がシグナル線(${macd.signal.toFixed(2)})を下抜け。売りトレンド転換シグナル。` });
+      }
+    }
+    // ヒストグラム方向
+    if (curHist !== null && prevHist !== null) {
+      if (curHist > 0 && curHist > prevHist) {
+        score += 5;
+        signals.push({ type: 'pos', title: '📊 MACD ヒストグラム拡大（買い優勢）', desc: `ヒストグラム ${curHist.toFixed(2)}。買いモメンタムが強まっている。` });
+      } else if (curHist < 0 && curHist < prevHist) {
+        score -= 5;
+        signals.push({ type: 'neg', title: '📊 MACD ヒストグラム縮小（売り優勢）', desc: `ヒストグラム ${curHist.toFixed(2)}。売りモメンタムが強まっている。` });
+      }
+    }
+    // ゼロライン上下
+    if (macd.macd > 0 && macd.signal > 0) {
+      score += 3;
+      signals.push({ type: 'pos', title: '🔵 MACDゼロライン上（上昇トレンド継続）', desc: `MACD線・シグナル線ともにゼロ以上。中期上昇トレンドが継続。` });
+    } else if (macd.macd < 0 && macd.signal < 0) {
+      score -= 3;
+      signals.push({ type: 'neg', title: '🔴 MACDゼロライン下（下降トレンド継続）', desc: `MACD線・シグナル線ともにゼロ以下。中期下降トレンドが継続。` });
+    }
+  }
+
+  // ══ ④ MA25 シグナル（最大±10点）══
+  if (ma25 !== null && curPrice !== null) {
+    const devPct = (curPrice - ma25) / ma25 * 100;
+    if (curPrice > ma25) {
+      if (devPct > 5) {
+        score -= 5;
+        signals.push({ type: 'neg', title: '📈 25日移動平均線から大幅乖離（過熱）', desc: `現在値が25日線(${ma25.toFixed(0)}円)を ${devPct.toFixed(1)}%上回る。過熱サインに注意。` });
+      } else {
+        score += 7;
+        signals.push({ type: 'pos', title: '📈 25日移動平均線上（上昇トレンド）', desc: `現在値(${curPrice.toFixed(0)}円)が25日線(${ma25.toFixed(0)}円)上。上昇トレンドが続いている。` });
+      }
+    } else {
+      if (devPct < -5) {
+        score += 8;
+        signals.push({ type: 'pos', title: '📉 25日移動平均線から大幅下方乖離（割安圏）', desc: `現在値が25日線(${ma25.toFixed(0)}円)を ${Math.abs(devPct).toFixed(1)}%下回る。反発余地あり。` });
+      } else {
+        score -= 5;
+        signals.push({ type: 'neg', title: '📉 25日移動平均線下（下降トレンド）', desc: `現在値(${curPrice.toFixed(0)}円)が25日線(${ma25.toFixed(0)}円)下。下降トレンドが続いている。` });
+      }
     }
   }
 
@@ -1173,13 +1276,19 @@ function analyzeStock() {
 function runAnalysis(prices) {
   const bb = calcBB(prices, Math.min(20, prices.length));
   const rciShort  = calcRCI(prices, Math.min(9, prices.length));
-  const rciLong   = prices.length >= 16 ? calcRCI(prices, Math.min(16, prices.length)) : null;
+  const rciLong   = prices.length >= 26 ? calcRCI(prices, 26) : null;
   // previous values (shift by 1)
-  const prevPrices = [prices[1], ...prices.slice(1)];
-  const prevRciShort = prevPrices.length >= 9 ? calcRCI(prevPrices, 9) : null;
-  const prevRciLong  = prevPrices.length >= 16 ? calcRCI(prevPrices, 16) : null;
+  const prevPrices   = prices.slice(1);
+  const prevRciShort = prevPrices.length >= 9  ? calcRCI(prevPrices, 9)  : null;
+  const prevRciLong  = prevPrices.length >= 26 ? calcRCI(prevPrices, 26) : null;
 
-  const { score, signals } = scoreFromBBRCI(bb, rciShort, rciLong, prevRciShort, prevRciLong);
+  // MACD (需要26+9=35本以上で最も信頼性高い、20本でも計算可)
+  const macd = calcMACD(prices);
+  // MA25
+  const ma25 = calcMA(prices, 25);
+  const curPrice = prices[0];
+
+  const { score, signals } = scoreFromIndicators(bb, rciShort, rciLong, prevRciShort, prevRciLong, macd, ma25, curPrice);
 
   // ─── Score ring ───
   const ring = document.getElementById('scoreRing');
@@ -1255,10 +1364,51 @@ function runAnalysis(prices) {
   rlBar.style.width = rciLongPct + '%';
   rlBar.style.background = rciLong !== null ? (rciLong <= -80 ? 'var(--green)' : rciLong >= 80 ? 'var(--red)' : 'var(--accent)') : 'var(--border)';
   document.getElementById('rciLongStatus').textContent =
-    rciLong === null ? 'データ不足（16日以上必要）' :
+    rciLong === null ? 'データ不足（26日以上必要）' :
     rciLong <= -80   ? '売られすぎ圏' :
     rciLong >= 80    ? '買われすぎ圏' :
     rciLong > 0      ? '上昇トレンド' : '下降トレンド';
+
+  // ─── MACD card ───
+  if (macd !== null && macd.macd !== null && macd.signal !== null) {
+    document.getElementById('macdVal').textContent = macd.macd.toFixed(2);
+    const macdPct = Math.max(0, Math.min(100, 50 + macd.macd / (Math.abs(macd.macd) + 0.01) * 25));
+    const macdBarEl = document.getElementById('macdBar');
+    macdBarEl.style.width = macdPct + '%';
+    macdBarEl.style.background = macd.macd > macd.signal ? 'var(--green)' : 'var(--red)';
+    let macdStatusTxt = '';
+    if (macd.prevMacd !== null && macd.prevSignal !== null) {
+      const gc = macd.prevMacd <= macd.prevSignal && macd.macd > macd.signal;
+      const dc = macd.prevMacd >= macd.prevSignal && macd.macd < macd.signal;
+      macdStatusTxt = gc ? 'GC（買いサイン）' : dc ? 'DC（売りサイン）' : (macd.macd > macd.signal ? '上昇優位' : '下降優位');
+    } else {
+      macdStatusTxt = macd.macd > macd.signal ? '上昇優位' : '下降優位';
+    }
+    document.getElementById('macdStatus').textContent = macdStatusTxt;
+    document.getElementById('macdStatus').style.color = macd.macd > macd.signal ? 'var(--green)' : 'var(--red)';
+  } else {
+    document.getElementById('macdVal').textContent = 'データ不足';
+    document.getElementById('macdStatus').textContent = '35日以上のデータが必要';
+    document.getElementById('macdStatus').style.color = 'var(--text-muted)';
+    document.getElementById('macdBar').style.width = '50%';
+  }
+
+  // ─── MA25 card ───
+  if (ma25 !== null) {
+    const devPct = (curPrice - ma25) / ma25 * 100;
+    document.getElementById('ma25Val').textContent = `${ma25.toFixed(0)}円 (${devPct > 0 ? '+' : ''}${devPct.toFixed(1)}%)`;
+    const ma25Pct = Math.max(0, Math.min(100, 50 + devPct * 5));
+    const ma25BarEl = document.getElementById('ma25Bar');
+    ma25BarEl.style.width = ma25Pct + '%';
+    ma25BarEl.style.background = curPrice > ma25 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('ma25Status').textContent = curPrice > ma25 ? '株価が25日線上（上昇トレンド）' : '株価が25日線下（下降トレンド）';
+    document.getElementById('ma25Status').style.color = curPrice > ma25 ? 'var(--green)' : 'var(--red)';
+  } else {
+    document.getElementById('ma25Val').textContent = 'データ不足';
+    document.getElementById('ma25Status').textContent = '25日以上のデータが必要';
+    document.getElementById('ma25Status').style.color = 'var(--text-muted)';
+    document.getElementById('ma25Bar').style.width = '50%';
+  }
 
   // BB marker
   document.getElementById('bbMarker').style.left = bbPct + '%';
@@ -1334,9 +1484,12 @@ function runAnalysis(prices) {
     }
   });
 
+  // ─── Price chart with MA25 overlay ───
+  // NOTE: MA25 is added to priceChart after creation (see below)
+
   // ─── RCI chart ───
   const rciShortSeries = calcRCISeries(prices, Math.min(9, prices.length)).reverse();
-  const rciLongSeries  = prices.length >= 16 ? calcRCISeries(prices, Math.min(16, prices.length)).reverse() : [];
+  const rciLongSeries  = prices.length >= 26 ? calcRCISeries(prices, 26).reverse() : [];
   const rciLabels = prices.map((_, i) => i === 0 ? '今日' : `${i}日前`).reverse().slice(-rciShortSeries.length);
 
   if (rciChartInst) rciChartInst.destroy();
@@ -1391,9 +1544,90 @@ function runAnalysis(prices) {
       }
     }
   });
-}
 
-// ─── Tab switching ───
+  // ─── Add MA25 to price chart ───
+  const ma25Series = calcMASeries(prices, 25);          // newest→oldest
+  const ma25Rev    = [...ma25Series].reverse();          // oldest→newest
+  if (priceChartInst && ma25Rev.some(v => v !== null)) {
+    priceChartInst.data.datasets.push({
+      label: 'MA25',
+      data: ma25Rev,
+      borderColor: 'rgba(251,191,36,0.9)',
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      pointRadius: 0,
+      fill: false
+    });
+    priceChartInst.update('none');
+  }
+
+  // ─── MACD chart ───
+  let macdLineData = [], sigLineData = [], histData = [], histColors = [];
+  if (macd && macd.series) {
+    macdLineData = [...macd.series.macd].reverse();
+    sigLineData  = [...macd.series.signal].reverse();
+    const histRaw = [...macd.series.hist].reverse();
+    histData   = histRaw;
+    histColors = histRaw.map(v => v === null ? 'transparent' : (v >= 0 ? 'rgba(34,197,94,0.65)' : 'rgba(239,68,68,0.65)'));
+  }
+
+  if (macdChartInst) macdChartInst.destroy();
+  const mCtx = document.getElementById('macdChart').getContext('2d');
+  macdChartInst = new Chart(mCtx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'ヒストグラム',
+          data: histData,
+          backgroundColor: histColors,
+          borderWidth: 0,
+          order: 3
+        },
+        {
+          type: 'line',
+          label: 'MACD線',
+          data: macdLineData,
+          borderColor: '#818cf8',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+          order: 1,
+          spanGaps: true
+        },
+        {
+          type: 'line',
+          label: 'シグナル線',
+          data: sigLineData,
+          borderColor: '#f59e0b',
+          borderWidth: 1.5,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+          order: 2,
+          spanGaps: true
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 20 } } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 9 }, maxTicksLimit: 7 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: {
+          ticks: { color: '#64748b', font: { size: 9 } },
+          grid: {
+            color: ctx => ctx.tick.value === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.04)'
+          }
+        }
+      }
+    }
+  });
+}
 function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1403,6 +1637,7 @@ function switchTab(tabId, btn) {
   // resize charts on tab switch
   if (tabId === 'tab-price' && priceChartInst) priceChartInst.resize();
   if (tabId === 'tab-rci'   && rciChartInst)   rciChartInst.resize();
+  if (tabId === 'tab-macd'  && macdChartInst)  macdChartInst.resize();
 }
 
 // ─── Password Lock ───
@@ -1479,5 +1714,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script src="https://www.genspark.ai/sandbox_inspect.js"></script></body>
+</body>
 </html>
