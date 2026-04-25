@@ -3,61 +3,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ファイルダウンロード</title>
+  <title>📁 ファイルダウンロード</title>
   <style>
     body {
       background: #0f172a; color: #f1f5f9;
-      font-family: 'Helvetica Neue', sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      min-height: 100vh; margin: 0; padding: 20px;
+      min-height: 100vh; margin: 0; padding: 24px;
       box-sizing: border-box;
     }
-    h1 { font-size: 20px; margin-bottom: 8px; }
-    p  { font-size: 13px; color: #94a3b8; margin-bottom: 32px; text-align: center; }
-    .btn {
-      display: block; width: 100%; max-width: 320px;
-      background: linear-gradient(135deg, #6366f1, #818cf8);
-      border: none; border-radius: 12px;
-      padding: 16px; color: #fff;
-      font-size: 16px; font-weight: 700;
-      text-align: center; text-decoration: none;
-      margin-bottom: 12px; cursor: pointer;
-      box-sizing: border-box;
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p  { color: #94a3b8; font-size: 14px; margin-bottom: 32px; text-align: center; }
+    .btn-group { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 360px; }
+    button {
+      padding: 16px 20px; border-radius: 12px; border: none; cursor: pointer;
+      font-size: 15px; font-weight: 600; transition: opacity 0.2s;
     }
-    .sub { font-size: 11px; color: #64748b; margin-top: 24px; text-align: center; line-height: 1.8; }
+    button:active { opacity: 0.7; }
+    .btn-main   { background: #6366f1; color: #fff; }
+    .btn-worker { background: #22c55e; color: #fff; }
+    .btn-sw     { background: #0ea5e9; color: #fff; }
+    .btn-mf     { background: #f59e0b; color: #fff; }
+    .note {
+      margin-top: 28px; background: #1e293b; border-radius: 12px;
+      padding: 16px 20px; font-size: 12px; color: #94a3b8;
+      max-width: 360px; width: 100%; line-height: 1.8;
+    }
+    .note strong { color: #f1f5f9; }
+    .err { color: #ef4444; font-size: 12px; margin-top: 6px; display: none; }
   </style>
 </head>
 <body>
   <h1>📁 ファイルダウンロード</h1>
-  <p>3つのファイルをダウンロードして<br>GitHubにアップロードしてください</p>
+  <p>GitHubにアップロードするファイルをダウンロードしてください</p>
 
-  <a class="btn" id="dl1" download="index.html">⬇️ index.html をダウンロード</a>
-  <a class="btn" id="dl2" download="manifest.json">⬇️ manifest.json をダウンロード</a>
-  <a class="btn" id="dl3" download="sw.js">⬇️ sw.js をダウンロード</a>
+  <div class="btn-group">
+    <button class="btn-main" onclick="dl('index.html')">⬇️ index.html をダウンロード</button>
+    <button class="btn-worker" onclick="dl('worker.js')">⬇️ worker.js をダウンロード</button>
+    <button class="btn-sw" onclick="dl('sw.js')">⬇️ sw.js をダウンロード</button>
+    <button class="btn-mf" onclick="dl('manifest.json')">⬇️ manifest.json をダウンロード</button>
+  </div>
+  <div id="err" class="err"></div>
 
-  <div class="sub">
-    ダウンロード後、GitHubの<br>
-    リポジトリにこの3ファイルを<br>
-    アップロードしてください
+  <div class="note">
+    <strong>GitHubへのアップ手順</strong><br>
+    1. 上のボタンで各ファイルをダウンロード<br>
+    2. GitHub の <code>kabu-judge</code> リポジトリを開く<br>
+    3. <strong>index.html と worker.js</strong> を必ず更新<br>
+    &nbsp;&nbsp;（該当ファイルを開く → 鉛筆アイコン → Upload new version）<br>
+    4. Commit changes → 1〜2分待つ<br>
+    5. <a href="https://mh10moyuk-spec.github.io/kabu-judge/" style="color:#818cf8" target="_blank">kabu-judge</a> を開いて動作確認<br><br>
+    <strong>worker.js を更新後</strong>、GitHub Actions が自動で<br>
+    Cloudflare Worker にデプロイします（約30秒）。
   </div>
 
   <script>
-    // 各ファイルをfetchしてBlobダウンロードリンクに変換
-    async function makeDownload(id, path, filename) {
+    async function dl(filename) {
+      const errEl = document.getElementById('err');
+      errEl.style.display = 'none';
       try {
-        const r = await fetch(path);
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.getElementById(id);
-        a.href = url;
+        const res = await fetch('./' + filename);
+        if (!res.ok) throw new Error(`${filename} が見つかりません (${res.status})`);
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
       } catch(e) {
-        document.getElementById(id).textContent = '⚠️ ' + filename + ' 取得失敗';
+        errEl.textContent = '⚠️ ' + e.message;
+        errEl.style.display = 'block';
       }
     }
-    makeDownload('dl1', './index.html',    'index.html');
-    makeDownload('dl2', './manifest.json', 'manifest.json');
-    makeDownload('dl3', './sw.js',         'sw.js');
   </script>
 </body>
 </html>

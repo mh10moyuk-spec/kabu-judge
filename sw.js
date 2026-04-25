@@ -4,6 +4,7 @@ const ASSETS = [
   './manifest.json'
 ];
 
+// 外部APIドメイン（キャッシュせず直接fetchさせる）
 const BYPASS_DOMAINS = [
   'api.twelvedata.com',
   'www.alphavantage.co',
@@ -32,9 +33,13 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // 外部APIドメインはService Workerをバイパスして直接fetch
   if (BYPASS_DOMAINS.some(domain => url.hostname.includes(domain))) {
-    return;
+    return; // バイパス（ブラウザのデフォルトfetchに任せる）
   }
+
+  // 同一オリジンのファイルはキャッシュ優先
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
