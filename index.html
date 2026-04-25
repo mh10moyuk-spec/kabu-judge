@@ -364,7 +364,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🕯️ v5.7 - 予想チャート修正</p>
+<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🕯️ v5.8 - 予想チャート視認性改善</p>
 </header>
 
 <main>
@@ -1551,14 +1551,15 @@ function drawForecastCandle(prices, opens, highs, lows, direction, pct, topColor
         trend = totalMove * Math.sin(progress * Math.PI * 2) * 0.3;
       }
       const mid = open + trend;
-      // ランダム揺らぎ（バー毎に差をつける）
-      const noise = (Math.random() - 0.5) * avgBody * 0.6;
-      const o = mid - avgBody * 0.1 + noise * 0.3;
-      const c = mid + avgBody * 0.1 + noise * 0.7;
-      // ヒゲ
+      // ランダム揺らぎ（小さめに抑えて実体をはっきり見せる）
+      const noise = (Math.random() - 0.5) * avgBody * 0.4;
+      const bodySize = Math.max(avgBody * 0.3, avgBody * 0.5 + noise);
+      const o = mid - bodySize * 0.45;
+      const c = mid + bodySize * 0.55;
+      // ヒゲ（短め）
       const bodyTop = Math.max(o, c), bodyBot = Math.min(o, c);
-      const h = bodyTop + avgUWick * (0.3 + Math.random() * 0.7);
-      const l = bodyBot - avgLWick * (0.3 + Math.random() * 0.7);
+      const h = bodyTop + avgUWick * (0.2 + Math.random() * 0.4);
+      const l = bodyBot - avgLWick * (0.2 + Math.random() * 0.4);
       bars.push({ o, c, h, l });
     }
     // 最初と最後のOHLCを確定値に揃える
@@ -1579,13 +1580,24 @@ function drawForecastCandle(prices, opens, highs, lows, direction, pct, topColor
 
   const bars = simulateDayCandles(predO, predC, predH, predL, N_BARS, direction);
 
-  // ── 価格レンジ（ローソク足の値動きのみ。トレードラインは後でクリップ）──
+  // ── 価格レンジ：ローソク足の実際の値動き ± 現在値の1.5% に絞る ──
   const candleHigh = Math.max(...bars.map(b => b.h));
   const candleLow  = Math.min(...bars.map(b => b.l));
-  const candleRange = candleHigh - candleLow || predO * 0.01;
-  const pad = candleRange * 0.35;  // 上下に余白
-  const lo = candleLow  - pad;
-  const hi = candleHigh + pad;
+  // トレードラインがチャート内に入る場合は範囲を少し広げる
+  let rangeHi = candleHigh;
+  let rangeLo = candleLow;
+  if (tradePlan) {
+    const tpVals = [tradePlan.entryVal, tradePlan.tp1Val, tradePlan.tp2Val, tradePlan.stopVal].filter(v => v && !isNaN(v));
+    tpVals.forEach(v => {
+      if (v > candleLow && v < candleHigh * 1.03) rangeHi = Math.max(rangeHi, v);
+      if (v < candleHigh && v > candleLow  * 0.97) rangeLo = Math.min(rangeLo, v);
+    });
+  }
+  const candleRange = rangeHi - rangeLo || predO * 0.015;
+  // パッドを小さくして変化を大きく見せる（上下 8% のみ）
+  const pad = candleRange * 0.12;
+  const lo = rangeLo - pad;
+  const hi = rangeHi + pad;
 
   // ── レイアウト ──
   const PAD_L = 48, PAD_R = 14, PAD_T = 18, PAD_B = 28;
