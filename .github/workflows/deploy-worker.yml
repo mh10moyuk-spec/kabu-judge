@@ -1,12 +1,8 @@
 name: Deploy Cloudflare Worker
-
 on:
   push:
-    branches: [main]
-    paths:
-      - 'worker.js'
-      - 'wrangler.toml'
-
+    branches:
+      - main
 jobs:
   deploy:
     runs-on: ubuntu-latest
