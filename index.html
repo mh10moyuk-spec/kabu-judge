@@ -137,31 +137,6 @@
     }
     .card-body { padding: 16px; }
 
-    /* ─── Stock Preset Buttons ─── */
-    .preset-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .preset-btn {
-      background: var(--bg-card2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: all 0.18s;
-      text-align: left;
-      color: var(--text);
-    }
-    .preset-btn:hover, .preset-btn.active {
-      border-color: var(--accent);
-      background: rgba(99,102,241,0.15);
-    }
-    .preset-btn .code { font-size: 11px; color: var(--accent2); font-weight: 600; }
-    .preset-btn .name { font-size: 13px; font-weight: 500; margin-top: 2px; }
-    .preset-btn .theme { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-
     /* ─── Input Area ─── */
     .input-row {
       display: flex; gap: 8px; align-items: center;
@@ -318,25 +293,7 @@
     .trade-note  { font-size: 10px; color: var(--text-muted); line-height: 1.4; }
 
     /* ─── Forecast ─── */
-    .forecast-body { display: flex; align-items: center; gap: 20px; padding: 4px 0 12px; }
-    .forecast-chart-wrap { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
-    .forecast-chart-wrap canvas { width: 140px !important; height: 140px !important; }
-    .forecast-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none; }
-    .forecast-center-icon  { font-size: 28px; line-height: 1; }
-    .forecast-center-pct   { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.1; }
-    .forecast-center-label { font-size: 10px; color: var(--text-muted); }
-    .forecast-legend { flex: 1; display: flex; flex-direction: column; gap: 12px; }
-    .forecast-legend-row { display: flex; align-items: center; gap: 10px; }
-    .fl-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
-    .fl-dot.up   { background: #22c55e; }
-    .fl-dot.flat { background: #818cf8; }
-    .fl-dot.down { background: #ef4444; }
-    .fl-name { font-size: 13px; color: var(--text-muted); flex: 1; }
-    .fl-pct  { font-size: 16px; font-weight: 800; min-width: 44px; text-align: right; }
-    .fl-pct.up   { color: #22c55e; }
-    .fl-pct.flat { color: #818cf8; }
-    .fl-pct.down { color: #ef4444; }
-    .forecast-reason { font-size: 12px; color: var(--text-muted); line-height: 1.7; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid var(--border); margin-top: 12px; }
+    .forecast-reason { font-size: 12px; color: var(--text-muted); line-height: 1.7; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid var(--border); }
 
     /* ─── Tabs ─── */
     .tab-bar {
@@ -407,7 +364,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🕯️ v5.5 - ローソク足チャート対応</p>
+<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🕯️ v5.7 - 予想チャート修正</p>
 </header>
 
 <main>
@@ -415,42 +372,12 @@
   <!-- ─── Input Card ─── -->
   <section class="card">
     <div class="card-header">
-      <i class="fa-solid fa-magnifying-glass-chart"></i> 銘柄を選択 / 株価を入力
+      <i class="fa-solid fa-magnifying-glass-chart"></i> 銘柄コードを入力
     </div>
     <div class="card-body">
-      <!-- Preset buttons -->
-      <div class="preset-grid" id="presetGrid">
-        <button class="preset-btn" data-code="2353" onclick="loadPreset(this)">
-          <div class="code">2353.T</div>
-          <div class="name">日本駐車場開発</div>
-          <div class="theme">配当・自社株買い</div>
-        </button>
-        <button class="preset-btn" data-code="5133" onclick="loadPreset(this)">
-          <div class="code">5133.T</div>
-          <div class="name">テリロジーHD</div>
-          <div class="theme">AI・セキュリティ</div>
-        </button>
-        <button class="preset-btn" data-code="8600" onclick="loadPreset(this)">
-          <div class="code">8600.T</div>
-          <div class="name">トモニHD</div>
-          <div class="theme">6期連続増益・低PBR</div>
-        </button>
-        <button class="preset-btn" data-code="8095" onclick="loadPreset(this)">
-          <div class="code">8095.T</div>
-          <div class="name">アステナHD</div>
-          <div class="theme">4期連続増益</div>
-        </button>
-        <button class="preset-btn" data-code="9997" onclick="loadPreset(this)">
-          <div class="code">9997.T</div>
-          <div class="name">ベルーナ</div>
-          <div class="theme">PBR 0.56・割安</div>
-        </button>
-
-      </div>
-
       <!-- Ticker + Fetch button -->
       <div class="input-row" style="margin-bottom: 8px;">
-        <input type="text" id="tickerInput" placeholder="銘柄コード（例: 7256）" maxlength="10"
+        <input type="text" id="tickerInput" placeholder="銘柄コード（例: 6085）" maxlength="10"
                onkeydown="if(event.key==='Enter')fetchAndAnalyze()">
         <button class="btn-analyze" id="fetchBtn" onclick="fetchAndAnalyze()">
           <i class="fa-solid fa-cloud-arrow-down"></i> 自動取得
@@ -546,52 +473,6 @@
       </div>
     </div>
 
-    <!-- Charts (tabbed) -->
-    <div class="card">
-      <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('tab-price', this)">価格チャート</button>
-        <button class="tab-btn" onclick="switchTab('tab-rci', this)">RCIチャート</button>
-        <button class="tab-btn" onclick="switchTab('tab-macd', this)">MACDチャート</button>
-        <button class="tab-btn" onclick="switchTab('tab-signals', this)">シグナル詳細</button>
-      </div>
-
-      <!-- Tab: Price chart -->
-      <div class="tab-pane active" id="tab-price">
-        <div class="chart-container">
-          <canvas id="priceChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Tab: RCI chart -->
-      <div class="tab-pane" id="tab-rci">
-        <div class="chart-container-rci" style="margin-bottom: 8px;">
-          <canvas id="rciChart"></canvas>
-        </div>
-        <div style="font-size: 11px; color: var(--text-muted); padding: 0 4px;">
-          <span style="color: var(--accent2);">■</span> RCI 短期（9日）　
-          <span style="color: var(--green);">■</span> RCI 長期（26日）　
-          点線: ±80（過熱ライン）
-        </div>
-      </div>
-
-      <!-- Tab: MACD chart -->
-      <div class="tab-pane" id="tab-macd">
-        <div class="chart-container-rci" style="margin-bottom: 8px;">
-          <canvas id="macdChart"></canvas>
-        </div>
-        <div style="font-size: 11px; color: var(--text-muted); padding: 0 4px;">
-          <span style="color: var(--accent2);">■</span> MACD線　
-          <span style="color: var(--yellow);">■</span> シグナル線　
-          <span style="color: var(--green);">■</span> ヒストグラム（正=買い優勢）
-        </div>
-      </div>
-
-      <!-- Tab: Signals -->
-      <div class="tab-pane" id="tab-signals">
-        <ul class="signal-list" id="signalList"></ul>
-      </div>
-    </div>
-
     <!-- 🎯 売買ライン目安カード -->
     <div class="card" id="tradePlanCard" style="display:none;">
       <div class="card-header"><i class="fa-solid fa-crosshairs"></i> 売買ライン目安</div>
@@ -628,36 +509,27 @@
     <div class="card" id="forecastCard" style="display:none;">
       <div class="card-header"><i class="fa-solid fa-wand-magic-sparkles"></i> 明日の動き予想</div>
       <div class="card-body">
-        <div class="forecast-body">
-          <!-- ドーナツチャート -->
-          <div class="forecast-chart-wrap">
-            <canvas id="forecastChart"></canvas>
-            <div class="forecast-center">
-              <div class="forecast-center-icon"  id="forecastIcon">–</div>
-              <div class="forecast-center-pct"   id="forecastTopPct">–</div>
-              <div class="forecast-center-label" id="forecastTopLabel">–</div>
-            </div>
-          </div>
-          <!-- 凡例 -->
-          <div class="forecast-legend">
-            <div class="forecast-legend-row">
-              <div class="fl-dot up"></div>
-              <span class="fl-name">上昇</span>
-              <span class="fl-pct up" id="probUpTxt">33%</span>
-            </div>
-            <div class="forecast-legend-row">
-              <div class="fl-dot flat"></div>
-              <span class="fl-name">横ばい</span>
-              <span class="fl-pct flat" id="probFlatTxt">34%</span>
-            </div>
-            <div class="forecast-legend-row">
-              <div class="fl-dot down"></div>
-              <span class="fl-name">下落</span>
-              <span class="fl-pct down" id="probDownTxt">33%</span>
-            </div>
+        <!-- ラベル行 -->
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <div id="forecastIcon" style="font-size:28px; line-height:1;">–</div>
+          <div>
+            <div id="forecastTopLabel" style="font-size:16px; font-weight:800; color:var(--text);">–</div>
+            <div id="forecastTopPct"   style="font-size:13px; color:var(--text-muted);">確率 –%</div>
           </div>
         </div>
-        <div class="forecast-reason" id="forecastReason">–</div>
+        <!-- ローソク足プレビュー Canvas -->
+        <div style="position:relative; height:220px; border-radius:10px; overflow:hidden;">
+          <canvas id="forecastCandleCanvas" style="width:100%; height:220px;"></canvas>
+        </div>
+        <!-- トレードラインの凡例 -->
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-size:10px;">
+          <span style="color:#38bdf8;">── 買いライン</span>
+          <span style="color:#a78bfa;">── 売却ライン①</span>
+          <span style="color:#818cf8;">── 売却ライン②</span>
+          <span style="color:#f87171;">── 損切ライン</span>
+        </div>
+        <!-- 理由 -->
+        <div class="forecast-reason" id="forecastReason" style="margin-top:10px;">–</div>
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.03); border-radius:8px;">
           ⚠️ 過去パターンの統計的参考値です。実際の動きを保証するものではありません。
         </div>
@@ -969,9 +841,15 @@ async function fetchAndAnalyze() {
     loadMsg.textContent = 'テクニカル指標を計算中...';
     setTimeout(() => {
       document.getElementById('loading').style.display = 'none';
-      runAnalysis(prices, opens, highs, lows, dates);
-      document.getElementById('result').style.display = 'block';
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        runAnalysis(prices, opens, highs, lows, dates);
+        document.getElementById('result').style.display = 'block';
+        document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch(e) {
+        console.error('runAnalysis error:', e);
+        document.getElementById('fetchStatus').innerHTML +=
+          `<br><small style="color:var(--red)">⚠️ 分析エラー: ${e.message}</small>`;
+      }
     }, 300);
 
   } catch (err) {
@@ -991,9 +869,15 @@ async function fetchAndAnalyze() {
       loadMsg.textContent = 'プリセットデータで分析中...';
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
-        runAnalysis(preset.prices, preset.opens||preset.prices, preset.highs||preset.prices, preset.lows||preset.prices, []);
-        document.getElementById('result').style.display = 'block';
-        document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+          runAnalysis(preset.prices, preset.opens||preset.prices, preset.highs||preset.prices, preset.lows||preset.prices, []);
+          document.getElementById('result').style.display = 'block';
+          document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch(e) {
+          console.error('runAnalysis preset error:', e);
+          document.getElementById('fetchStatus').innerHTML +=
+            `<br><small style="color:var(--red)">⚠️ 分析エラー: ${e.message}</small>`;
+        }
       }, 300);
     } else {
       statusEl.innerHTML =
@@ -1036,7 +920,7 @@ const PRESETS = {
 };
 
 let priceChartInst = null;
-let forecastChartInst = null;
+// forecastChartInst は不要（ローソク足Canvas版に移行）
 let rciChartInst = null;
 let macdChartInst = null;
 
@@ -1468,157 +1352,9 @@ function runAnalysis(prices, opens, highs, lows, dates) {
   // BB marker
   document.getElementById('bbMarker').style.left = bbPct + '%';
 
-  // ─── Signal list ───
-  const ul = document.getElementById('signalList');
-  ul.innerHTML = '';
-  if (signals.length === 0) {
-    ul.innerHTML = '<li style="color: var(--text-muted); justify-content: center; padding: 16px;">シグナルなし（中立局面）</li>';
-  }
-  signals.forEach(s => {
-    const li = document.createElement('li');
-    li.innerHTML = `
-      <div class="sig-icon ${s.type}"><i class="fa-solid ${s.type === 'pos' ? 'fa-arrow-up' : s.type === 'neg' ? 'fa-arrow-down' : 'fa-minus'}"></i></div>
-      <div class="sig-text">
-        <div class="sig-title">${s.title}</div>
-        <div class="sig-desc">${s.desc}</div>
-      </div>`;
-    ul.appendChild(li);
-  });
-
-  // ─── Price chart (ローソク足 + BB + MA5 + MA25) ───
-  drawCandleChart({
-    canvasId: 'priceChart',
-    prices, opens, highs, lows, dates
-  });
-
-  // ─── RCI chart ───
-  const rciShortSeries = calcRCISeries(prices, Math.min(9, prices.length)).reverse();
-  const rciLongSeries  = prices.length >= 26 ? calcRCISeries(prices, 26).reverse() : [];
-  const rciLabels = prices.map((_, i) => i === 0 ? '今日' : `${i}日前`).reverse().slice(-rciShortSeries.length);
-
-  if (rciChartInst) rciChartInst.destroy();
-  const rCtx = document.getElementById('rciChart').getContext('2d');
-  rciChartInst = new Chart(rCtx, {
-    type: 'line',
-    data: {
-      labels: rciLabels,
-      datasets: [
-        {
-          label: 'RCI短期',
-          data: rciShortSeries,
-          borderColor: '#818cf8',
-          borderWidth: 2,
-          pointRadius: 1.5,
-          tension: 0.3,
-          fill: false
-        },
-        {
-          label: 'RCI長期',
-          data: rciLongSeries.length ? rciLongSeries : [],
-          borderColor: '#22c55e',
-          borderWidth: 2,
-          pointRadius: 1.5,
-          tension: 0.3,
-          fill: false
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 20 } },
-        annotation: {}
-      },
-      scales: {
-        x: { ticks: { color: '#64748b', font: { size: 9 }, maxTicksLimit: 7 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: {
-          min: -100, max: 100,
-          ticks: {
-            color: '#64748b', font: { size: 9 },
-            callback: v => v === 80 ? '+80' : v === -80 ? '-80' : v === 0 ? '0' : ''
-          },
-          grid: {
-            color: ctx => {
-              if (ctx.tick.value === 80 || ctx.tick.value === -80) return 'rgba(239,68,68,0.4)';
-              if (ctx.tick.value === 0) return 'rgba(255,255,255,0.1)';
-              return 'rgba(255,255,255,0.04)';
-            }
-          }
-        }
-      }
-    }
-  });
-
-  // ─── MACD chart ───
-  let macdLineData = [], sigLineData = [], histData = [], histColors = [];
-  if (macd && macd.series) {
-    macdLineData = [...macd.series.macd].reverse();
-    sigLineData  = [...macd.series.signal].reverse();
-    const histRaw = [...macd.series.hist].reverse();
-    histData   = histRaw;
-    histColors = histRaw.map(v => v === null ? 'transparent' : (v >= 0 ? 'rgba(34,197,94,0.65)' : 'rgba(239,68,68,0.65)'));
-  }
-
-  if (macdChartInst) macdChartInst.destroy();
-  const mCtx = document.getElementById('macdChart').getContext('2d');
-  macdChartInst = new Chart(mCtx, {
-    data: {
-      labels,
-      datasets: [
-        {
-          type: 'bar',
-          label: 'ヒストグラム',
-          data: histData,
-          backgroundColor: histColors,
-          borderWidth: 0,
-          order: 3
-        },
-        {
-          type: 'line',
-          label: 'MACD線',
-          data: macdLineData,
-          borderColor: '#818cf8',
-          borderWidth: 2,
-          pointRadius: 0,
-          tension: 0.3,
-          fill: false,
-          order: 1,
-          spanGaps: true
-        },
-        {
-          type: 'line',
-          label: 'シグナル線',
-          data: sigLineData,
-          borderColor: '#f59e0b',
-          borderWidth: 1.5,
-          borderDash: [4, 3],
-          pointRadius: 0,
-          tension: 0.3,
-          fill: false,
-          order: 2,
-          spanGaps: true
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 20 } } },
-      scales: {
-        x: { ticks: { color: '#64748b', font: { size: 9 }, maxTicksLimit: 7 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: {
-          ticks: { color: '#64748b', font: { size: 9 } },
-          grid: {
-            color: ctx => ctx.tick.value === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.04)'
-          }
-        }
-      }
-    }
-  });
-
   // ─── 売買ライン & 明日予想 ───
-  calcTradePlan(bb, ma25, prices);
-  calcForecast(bb, rciShort, rciLong, macd, prices);
+  const tradePlan = calcTradePlan(bb, ma25, prices);
+  calcForecast(bb, rciShort, rciLong, macd, prices, opens, highs, lows, tradePlan);
 }
 
 // ─── 売買ライン計算 ───
@@ -1654,15 +1390,17 @@ function calcTradePlan(bb, ma25, prices) {
 
   document.getElementById('tp2Price').textContent = fmt(tp2Val);
   document.getElementById('tp2Note').textContent  = `現在値比 +${pct(tp2Val)}%　(+2σ 上限)`;
+
+  return { entryVal, stopVal, tp1Val, tp2Val };
 }
 
 // ─── 明日の動き予想 ───
-function calcForecast(bb, rciShort, rciLong, macd, prices) {
+function calcForecast(bb, rciShort, rciLong, macd, prices, opens, highs, lows, tradePlan) {
   const card = document.getElementById('forecastCard');
   card.style.display = 'block';
 
+  // ── スコア計算 ──
   let upScore = 0, downScore = 0;
-
   if (bb) {
     const sig = bb.sigmaPos;
     if (sig <= -2) upScore += 30;
@@ -1701,69 +1439,277 @@ function calcForecast(bb, rciShort, rciLong, macd, prices) {
   probDown = Math.round(probDown / sum * 100);
   probFlat = 100 - probUp - probDown;
 
-  // 最大確率
-  let topIcon, topLabel, topPct, topColor;
+  // 最大確率の方向を決定
+  let topIcon, topLabel, topPct, topColor, direction;
   if (probUp >= probDown && probUp >= probFlat) {
-    topIcon = '📈'; topLabel = '上昇優勢'; topPct = probUp;   topColor = '#22c55e';
+    topIcon = '📈'; topLabel = '上昇優勢'; topPct = probUp;   topColor = '#22c55e'; direction = 'up';
   } else if (probDown >= probUp && probDown >= probFlat) {
-    topIcon = '📉'; topLabel = '下落優勢'; topPct = probDown; topColor = '#ef4444';
+    topIcon = '📉'; topLabel = '下落優勢'; topPct = probDown; topColor = '#ef4444'; direction = 'down';
   } else {
-    topIcon = '➡️'; topLabel = '横ばい優勢'; topPct = probFlat; topColor = '#818cf8';
+    topIcon = '➡️'; topLabel = '横ばい優勢'; topPct = probFlat; topColor = '#818cf8'; direction = 'flat';
   }
 
-  // ドーナツチャート中心テキスト
-  document.getElementById('forecastIcon').textContent      = topIcon;
-  document.getElementById('forecastTopPct').textContent    = topPct + '%';
-  document.getElementById('forecastTopLabel').textContent  = topLabel;
+  // ラベル更新
+  document.getElementById('forecastIcon').textContent = topIcon;
+  document.getElementById('forecastTopLabel').style.color = topColor;
+  document.getElementById('forecastTopLabel').textContent = topLabel;
+  document.getElementById('forecastTopPct').textContent   = `確率 ${topPct}%`;
 
-  // 凡例テキスト
-  document.getElementById('probUpTxt').textContent   = probUp   + '%';
-  document.getElementById('probFlatTxt').textContent = probFlat + '%';
-  document.getElementById('probDownTxt').textContent = probDown + '%';
-
-  // ドーナツチャート描画
-  if (forecastChartInst) forecastChartInst.destroy();
-  const fCtx = document.getElementById('forecastChart').getContext('2d');
-  forecastChartInst = new Chart(fCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['上昇', '横ばい', '下落'],
-      datasets: [{
-        data: [probUp, probFlat, probDown],
-        backgroundColor: ['#22c55e', '#818cf8', '#ef4444'],
-        borderWidth: 0,
-        hoverOffset: 4
-      }]
-    },
-    options: {
-      responsive: false,
-      cutout: '68%',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}%` }
-        }
-      },
-      animation: { duration: 700 }
-    }
-  });
+  // ── 予想ローソク足Canvasを描画（9:00〜15:30 1日予想）──
+  drawForecastCandle(prices, opens, highs, lows, direction, topPct, topColor, tradePlan);
 
   // 理由テキスト
   const reasons = [];
   if (bb && bb.sigmaPos <= -1.5) reasons.push('BBが売られすぎ圏（反発期待）');
   if (bb && bb.sigmaPos >= 1.5)  reasons.push('BBが買われすぎ圏（反落注意）');
-  if (rciShort !== null && rciShort <= -80) reasons.push('RCI短期が-80以下（底値圏）');
-  if (rciShort !== null && rciShort >= 80)  reasons.push('RCI短期が+80以上（過熱圏）');
+  if (rciShort !== null && rciShort <= -80) reasons.push('RCI短期-80以下（底値圏）');
+  if (rciShort !== null && rciShort >= 80)  reasons.push('RCI短期+80以上（過熱圏）');
   if (macd && macd.hist !== null && macd.prevHist !== null) {
-    reasons.push(macd.hist > macd.prevHist ? 'MACDヒストグラム拡大（買いモメンタム）' : 'MACDヒストグラム縮小（売りモメンタム）');
+    reasons.push(macd.hist > macd.prevHist ? 'MACDヒスト拡大（買いモメ）' : 'MACDヒスト縮小（売りモメ）');
   }
   if (prices.length >= 4) {
     const mom = prices[0] - prices[3];
-    reasons.push(`直近3日: ${mom > 0 ? '+' : ''}${Math.round(mom)}円`);
+    reasons.push(`直近3日 ${mom > 0 ? '↑+' : '↓'}${Math.round(mom)}円`);
   }
   document.getElementById('forecastReason').textContent =
     reasons.length ? reasons.join('　/　') : '判断材料が不足しています';
 }
+
+// ── 明日の1日予想チャート（9:00〜15:30）描画 ──
+// 時間軸ローソク足（30分刻み）＋売買/損切ライン横線
+function drawForecastCandle(prices, opens, highs, lows, direction, pct, topColor, tradePlan) {
+  const canvas = document.getElementById('forecastCandleCanvas');
+  if (!canvas) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const W   = canvas.offsetWidth  || 320;
+  const H   = canvas.offsetHeight || 220;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // ── 直近5日間の平均値動き計算 ──
+  const PAST = Math.min(5, prices.length);
+  const pastC = prices.slice(0, PAST).reverse();
+  const pastO = (opens && opens !== prices ? opens : prices).slice(0, PAST).reverse();
+  const pastH = (highs && highs !== prices ? highs : prices).slice(0, PAST).reverse();
+  const pastL = (lows  && lows  !== prices ? lows  : prices).slice(0, PAST).reverse();
+
+  const avgBody  = pastC.reduce((a,v,i) => a + Math.abs(v - pastO[i]), 0) / PAST || prices[0] * 0.008;
+  const avgUWick = pastH.reduce((a,v,i) => a + (v - Math.max(pastC[i], pastO[i])), 0) / PAST || prices[0] * 0.003;
+  const avgLWick = pastL.reduce((a,v,i) => a + (Math.min(pastC[i], pastO[i]) - v), 0) / PAST || prices[0] * 0.003;
+
+  // 今日の終値 = 明日の寄り付き（始値）
+  const todayClose = prices[0];
+  const strength   = 0.4 + (pct - 40) / 120;
+
+  // 明日の予想OHLC
+  let predO = todayClose, predC, predH, predL;
+  if (direction === 'up') {
+    predC = predO + avgBody * strength * 1.1;
+    predH = predC + avgUWick * 0.9;
+    predL = predO - avgLWick * 0.6;
+  } else if (direction === 'down') {
+    predC = predO - avgBody * strength * 1.1;
+    predH = predO + avgUWick * 0.6;
+    predL = predC - avgLWick * 0.9;
+  } else {
+    predC = predO + avgBody * 0.1 * (Math.random() > 0.5 ? 1 : -1);
+    predH = Math.max(predO, predC) + avgUWick * 0.8;
+    predL = Math.min(predO, predC) - avgLWick * 0.8;
+  }
+
+  // ── 時間軸の設定（9:00〜15:30 = 13本の30分足）──
+  // 9:00, 9:30, 10:00, 10:30, 11:00, 11:30, [12:30], 13:00, 13:30, 14:00, 14:30, 15:00, 15:30
+  const TIME_SLOTS = [
+    '9:00','9:30','10:00','10:30','11:00','11:30',
+    '13:00','13:30','14:00','14:30','15:00','15:30'
+  ];
+  const N_BARS = TIME_SLOTS.length; // 12本
+
+  // ── 価格シミュレーション（方向に沿った途中経過を生成）──
+  // Brownian motion風にN_BARS本のローソクを生成
+  function simulateDayCandles(open, close, high, low, n, dir) {
+    const bars = [];
+    const totalMove = close - open;
+    // 途中の値動きをsinカーブ＋ランダムで表現
+    for (let i = 0; i < n; i++) {
+      const progress = i / (n - 1);
+      // 基本トレンド成分
+      let trend;
+      if (dir === 'up') {
+        // 最初は少し下げてから上昇（寄り天井回避）
+        trend = totalMove * (progress < 0.2 ? -progress * 0.5 : (progress - 0.2) / 0.8 * 1.1);
+      } else if (dir === 'down') {
+        // 最初に急落してから少し戻す
+        trend = totalMove * (progress < 0.6 ? progress / 0.6 * 1.1 : 1.1 - (progress - 0.6) / 0.4 * 0.15);
+      } else {
+        // 横ばい：上下に小刻み
+        trend = totalMove * Math.sin(progress * Math.PI * 2) * 0.3;
+      }
+      const mid = open + trend;
+      // ランダム揺らぎ（バー毎に差をつける）
+      const noise = (Math.random() - 0.5) * avgBody * 0.6;
+      const o = mid - avgBody * 0.1 + noise * 0.3;
+      const c = mid + avgBody * 0.1 + noise * 0.7;
+      // ヒゲ
+      const bodyTop = Math.max(o, c), bodyBot = Math.min(o, c);
+      const h = bodyTop + avgUWick * (0.3 + Math.random() * 0.7);
+      const l = bodyBot - avgLWick * (0.3 + Math.random() * 0.7);
+      bars.push({ o, c, h, l });
+    }
+    // 最初と最後のOHLCを確定値に揃える
+    bars[0].o = open;
+    bars[n-1].c = close;
+    // 全体の高値・安値を予想値に収める
+    const curMax = Math.max(...bars.map(b => b.h));
+    const curMin = Math.min(...bars.map(b => b.l));
+    const scaleH = curMax > high  ? high  / curMax : 1;
+    const scaleL = curMin < low   ? low   / curMin : 1;
+    return bars.map(b => ({
+      o: b.o,
+      c: b.c,
+      h: Math.min(b.h, high  + avgUWick * 0.3),
+      l: Math.max(b.l, low   - avgLWick * 0.3)
+    }));
+  }
+
+  const bars = simulateDayCandles(predO, predC, predH, predL, N_BARS, direction);
+
+  // ── 価格レンジ（ローソク足の値動きのみ。トレードラインは後でクリップ）──
+  const candleHigh = Math.max(...bars.map(b => b.h));
+  const candleLow  = Math.min(...bars.map(b => b.l));
+  const candleRange = candleHigh - candleLow || predO * 0.01;
+  const pad = candleRange * 0.35;  // 上下に余白
+  const lo = candleLow  - pad;
+  const hi = candleHigh + pad;
+
+  // ── レイアウト ──
+  const PAD_L = 48, PAD_R = 14, PAD_T = 18, PAD_B = 28;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+  const toY = v => PAD_T + (1 - (v - lo) / (hi - lo)) * chartH;
+  const step = chartW / N_BARS;
+  const toX = i => PAD_L + step * i + step * 0.5;
+
+  // ── 背景 ──
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── 昼休み区切り（11:30〜13:00）──
+  const lunchStart = toX(5) + step * 0.5; // 11:30後
+  const lunchEnd   = toX(6) - step * 0.5; // 13:00前
+  if (lunchEnd > lunchStart) {
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(lunchStart, PAD_T, lunchEnd - lunchStart, chartH);
+    ctx.fillStyle = 'rgba(100,116,139,0.5)';
+    ctx.font = '8px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('昼休', (lunchStart + lunchEnd) / 2, PAD_T + chartH / 2);
+  }
+
+  // ── グリッド（Y軸4本）＋ Y軸ラベル ──
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const yv = lo + (hi - lo) * g / 4;
+    const yp = toY(yv);
+    ctx.beginPath(); ctx.moveTo(PAD_L, yp); ctx.lineTo(W - PAD_R, yp); ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(yv).toLocaleString(), PAD_L - 3, yp + 3);
+  }
+
+  // ── トレードライン（横線）── チャート範囲内のみ表示
+  if (tradePlan) {
+    const lines = [
+      { val: tradePlan.entryVal, color: '#38bdf8', dash: [5,3], label: '買い', bold: true },
+      { val: tradePlan.tp1Val,   color: '#a78bfa', dash: [5,3], label: '売却①', bold: false },
+      { val: tradePlan.tp2Val,   color: '#818cf8', dash: [5,3], label: '売却②', bold: false },
+      { val: tradePlan.stopVal,  color: '#f87171', dash: [4,3], label: '損切', bold: true },
+    ];
+    lines.forEach(({ val, color, dash, label, bold }) => {
+      if (!val || isNaN(val)) return;
+      const yp = toY(val);
+      // チャート描画エリア外はスキップ
+      if (yp < PAD_T || yp > PAD_T + chartH) return;
+      ctx.save();
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = bold ? 1.5 : 1;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.moveTo(PAD_L, yp); ctx.lineTo(W - PAD_R, yp); ctx.stroke();
+      ctx.restore();
+      // ラベルは右端に配置（ラインの右）
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.font = `bold 8px sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.globalAlpha = 1.0;
+      ctx.fillText(`${label} ${Math.round(val).toLocaleString()}`, W - PAD_R - 2, yp - 2);
+      ctx.restore();
+    });
+  }
+
+  // ── ローソク足描画 ──
+  const barW = Math.max(6, Math.floor(step * 0.68));  // 最低6px確保
+  const fClr = direction === 'up' ? '#22c55e' : direction === 'down' ? '#ef4444' : '#818cf8';
+  bars.forEach((bar, i) => {
+    const xc   = toX(i);
+    const isUp = bar.c >= bar.o;
+    // 全バーを予想色でグロー（薄め）
+    const baseClr = isUp ? '#22c55e' : '#ef4444';
+    const yO  = toY(bar.o), yC = toY(bar.c);
+    const yH_ = toY(bar.h), yL_ = toY(bar.l);
+    const bTop = Math.min(yO, yC), bBot = Math.max(yO, yC);
+
+    // グロー効果（最後のバーは強め）
+    ctx.save();
+    ctx.shadowColor = fClr;
+    ctx.shadowBlur  = i === N_BARS - 1 ? 12 : 4;
+    ctx.strokeStyle = baseClr; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(xc, yH_); ctx.lineTo(xc, bTop);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xc, bBot); ctx.lineTo(xc, yL_); ctx.stroke();
+    // 実体（透明度: 最後だけ濃く）
+    ctx.fillStyle = baseClr;
+    ctx.globalAlpha = i === N_BARS - 1 ? 1.0 : 0.80;
+    const bodyH = Math.max(3, bBot - bTop);  // 実体最低3px
+    ctx.fillRect(xc - barW/2, bTop, barW, bodyH);
+    ctx.restore();
+  });
+
+  // ── X軸ラベル（時刻）──
+  ctx.fillStyle = '#475569';
+  ctx.font = '8px sans-serif';
+  ctx.textAlign = 'center';
+  // 最初・最後・4等分のみ表示
+  const showIdx = [0, 3, 5, 8, 11];
+  showIdx.forEach(i => {
+    if (i < N_BARS) ctx.fillText(TIME_SLOTS[i], toX(i), H - 8);
+  });
+
+  // ── タイトル「明日の予想（9:00〜15:30）」──
+  const arrow = direction === 'up' ? '▲' : direction === 'down' ? '▼' : '▶';
+  ctx.fillStyle = fClr;
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${arrow} ${direction === 'up' ? '上昇' : direction === 'down' ? '下落' : '横ばい'}優勢 ${pct}%`, PAD_L + 2, PAD_T - 4);
+
+  // ── 寄り付き・引け予想値 ──
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`寄 ${Math.round(predO).toLocaleString()}`, toX(0) - step * 0.3, toY(predO) - 3);
+  ctx.fillStyle = fClr;
+  ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`引 ${Math.round(predC).toLocaleString()}`, toX(N_BARS - 1) + step * 0.3, toY(predC) - 3);
+}
+
 
 // ─────────────────────────────────────────────────────────
 // ローソク足チャート描画（Canvas 2D API直接描画）
@@ -1822,7 +1768,7 @@ function drawCandleChart({ canvasId, prices, opens, highs, lows, dates }) {
   ctx.scale(dpr, dpr);
 
   // パディング
-  const PAD_L = 46, PAD_R = 12, PAD_T = 16, PAD_B = 36;
+  const PAD_L = 46, PAD_R = 12, PAD_T = 8, PAD_B = 36;
   const chartW = W - PAD_L - PAD_R;
   const chartH = H - PAD_T - PAD_B;
 
@@ -1946,27 +1892,6 @@ function drawCandleChart({ canvasId, prices, opens, highs, lows, dates }) {
   ctx.fillStyle = '#94a3b8';
   ctx.font = `bold 9px sans-serif`;
   ctx.fillText('今日', toX(n-1), H - 6);
-
-  // 凡例（右上）
-  const legends = [
-    { color: '#22c55e', label: '陽線' },
-    { color: '#ef4444', label: '陰線' },
-    { color: 'rgba(56,189,248,0.9)',   label: 'MA5' },
-    { color: 'rgba(251,191,36,0.9)',   label: 'MA25' },
-    { color: 'rgba(99,102,241,0.8)',   label: 'BB中心' },
-    { color: 'rgba(239,68,68,0.6)',    label: '±2σ' },
-  ];
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left';
-  legends.forEach((lg, idx) => {
-    const lx = PAD_L + idx * 52;
-    const ly = PAD_T - 4;
-    if (lx + 48 > W) return;
-    ctx.fillStyle = lg.color;
-    ctx.fillRect(lx, ly - 6, 10, 6);
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillText(lg.label, lx + 13, ly);
-  });
 }
 
 function switchTab(tabId, btn) {
