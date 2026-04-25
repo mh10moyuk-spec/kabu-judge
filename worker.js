@@ -12,6 +12,7 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
+    // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -35,12 +36,23 @@ export default {
   }
 };
 
+// ─── メイン: Stooq → Yahoo Finance v8 の順で試す ───
 async function fetchByCode(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '').toLowerCase();
+
+  // ① Stooq CSV（東証→名証→大証→福証）
   const stooqResult = await tryStooq(pure);
-  if (stooqResult.success) return jsonResponse(stooqResult);
+  if (stooqResult.success) {
+    return jsonResponse(stooqResult);
+  }
+
+  // ② Yahoo Finance v8 API（東証→名証→大証の順）
   const yahooResult = await tryYahooFinance(pure);
-  if (yahooResult.success) return jsonResponse(yahooResult);
+  if (yahooResult.success) {
+    return jsonResponse(yahooResult);
+  }
+
+  // 全失敗
   return jsonResponse({
     success: false,
     message: `取得失敗: ${code} (Stooq: ${stooqResult.message} / Yahoo: ${yahooResult.message})`,
@@ -48,11 +60,13 @@ async function fetchByCode(code) {
   });
 }
 
+// ─── Stooq CSV取得 ───
 async function tryStooq(pure) {
   const suffixes = ['.jp', '.nj', '.oj', '.fj'];
   for (const suffix of suffixes) {
+    const stooqUrl = `https://stooq.com/q/d/l/?s=${pure}${suffix}&i=d`;
     try {
-      const res = await fetch(`https://stooq.com/q/d/l/?s=${pure}${suffix}&i=d`, {
+      const res = await fetch(stooqUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/csv,text/plain,*/*',
@@ -63,19 +77,25 @@ async function tryStooq(pure) {
       const text = await res.text();
       if (text.includes('<html') || text.includes('<!DOCTYPE') || text.length < 30) continue;
       if (!text.toLowerCase().includes('date')) continue;
+
       const parsed = parseStooqCSV(text, pure);
       if (parsed.success) return parsed;
-    } catch (e) { continue; }
+    } catch (e) {
+      continue;
+    }
   }
   return { success: false, message: 'Stooq全サフィックス失敗' };
 }
 
+// ─── Yahoo Finance v8 API取得 ───
 async function tryYahooFinance(pure) {
-  const suffixes = ['.T', '.N', '.O', '.S'];
+  // 東証→名証→大証→札証の順
+  const suffixes = ['.T', '.N', '.O', '.S', '.T'];
   for (const suffix of suffixes) {
     const ticker = pure + suffix;
+    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=3mo&region=JP&lang=ja-JP`;
     try {
-      const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=3mo&region=JP&lang=ja-JP`, {
+      const res = await fetch(yahooUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'application/json',
@@ -88,14 +108,19 @@ async function tryYahooFinance(pure) {
       const data = await res.json();
       const result = data?.chart?.result?.[0];
       if (!result) continue;
-      const closes = result.indicators?.quote?.[0]?.close;
+
+      const closes     = result.indicators?.quote?.[0]?.close;
       const timestamps = result.timestamp;
       if (!closes || !timestamps || closes.length < 3) continue;
+
       const pairs = timestamps
         .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
         .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
-        .slice(-20).reverse();
+        .slice(-20)
+        .reverse();
+
       if (pairs.length < 3) continue;
+
       const name = result.meta?.longName || result.meta?.shortName || ticker;
       return {
         success: true,
@@ -105,18 +130,25 @@ async function tryYahooFinance(pure) {
         source: `Yahoo(${ticker})`,
         name
       };
-    } catch (e) { continue; }
+    } catch (e) {
+      continue;
+    }
   }
   return { success: false, message: 'Yahoo全サフィックス失敗' };
 }
 
+// ─── Stooq CSVパース ───
 function parseStooqCSV(text, code) {
   try {
     const lines = text.trim().split('\n').filter(l => l.trim());
     const dataLines = lines.filter(l => !l.toLowerCase().startsWith('date'));
-    if (dataLines.length < 3) return { success: false, message: `データ行不足(${dataLines.length}行)` };
+    if (dataLines.length < 3) {
+      return { success: false, message: `データ行不足(${dataLines.length}行)` };
+    }
+
     const recent = dataLines.slice(-30).reverse().slice(0, 20);
     const prices = [], dates = [];
+
     for (const line of recent) {
       const cols = line.split(',');
       if (cols.length < 5) continue;
@@ -128,17 +160,26 @@ function parseStooqCSV(text, code) {
       prices.push(closeVal);
       dates.push(label);
     }
-    if (prices.length < 3) return { success: false, message: `有効データ不足(${prices.length}件)` };
+
+    if (prices.length < 3) {
+      return { success: false, message: `有効データ不足(${prices.length}件)` };
+    }
+
     return { success: true, prices, dates, count: prices.length, source: 'Stooq' };
   } catch (e) {
     return { success: false, message: `パースエラー: ${e.message}` };
   }
 }
 
+// ─── 汎用URLプロキシ ───
 async function proxyUrl(target) {
   try {
     const res = await fetch(target, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*', 'Accept-Language': 'ja-JP,ja;q=0.9' }
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'ja-JP,ja;q=0.9',
+      }
     });
     const contentType = res.headers.get('Content-Type') || 'text/plain';
     const body = await res.text();
@@ -151,6 +192,7 @@ async function proxyUrl(target) {
   }
 }
 
+// ─── JSONレスポンスヘルパー ───
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
