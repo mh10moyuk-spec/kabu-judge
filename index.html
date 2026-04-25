@@ -581,76 +581,6 @@
       <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('tab-price', this)">価格チャート</button>
         <button class="tab-btn" onclick="switchTab('tab-rci', this)">RCIチャート</button>
-
-    <!-- 🎯 買売ライン・明日予想カード -->
-    <div class="card" id="tradePlanCard" style="display:none;">
-      <div class="card-header"><i class="fa-solid fa-crosshairs"></i> 売買ライン目安</div>
-      <div class="card-body">
-        <div class="trade-grid">
-          <div class="trade-row entry">
-            <div class="trade-label">🟢 買いエントリー目安</div>
-            <div class="trade-val" id="entryPrice">–</div>
-            <div class="trade-note" id="entryNote">–</div>
-          </div>
-          <div class="trade-row stop">
-            <div class="trade-label">🔴 損切りライン</div>
-            <div class="trade-val" id="stopPrice">–</div>
-            <div class="trade-note" id="stopNote">–</div>
-          </div>
-          <div class="trade-row tp1">
-            <div class="trade-label">🎯 利確①（MA25）</div>
-            <div class="trade-val" id="tp1Price">–</div>
-            <div class="trade-note" id="tp1Note">–</div>
-          </div>
-          <div class="trade-row tp2">
-            <div class="trade-label">🚀 利確②（+2σ）</div>
-            <div class="trade-val" id="tp2Price">–</div>
-            <div class="trade-note" id="tp2Note">–</div>
-          </div>
-        </div>
-        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius:6px;">
-          ⚠️ これはテクニカル分析に基づく参考値です。投資判断は自己責任でお願いします。
-        </div>
-      </div>
-    </div>
-
-    <!-- 🔮 明日の動き予想カード -->
-    <div class="card" id="forecastCard" style="display:none;">
-      <div class="card-header"><i class="fa-solid fa-wand-magic-sparkles"></i> 明日の動き予想</div>
-      <div class="card-body">
-        <div class="forecast-main">
-          <div class="forecast-icon" id="forecastIcon">–</div>
-          <div class="forecast-label" id="forecastLabel">–</div>
-        </div>
-        <div class="forecast-bars">
-          <div class="forecast-bar-row">
-            <span class="fb-label up">📈 上昇</span>
-            <div class="fb-track"><div class="fb-fill up" id="probUp" style="width:33%"></div></div>
-            <span class="fb-pct" id="probUpTxt">33%</span>
-          </div>
-          <div class="forecast-bar-row">
-            <span class="fb-label flat">➡️ 横ばい</span>
-            <div class="fb-track"><div class="fb-fill flat" id="probFlat" style="width:34%"></div></div>
-            <span class="fb-pct" id="probFlatTxt">34%</span>
-          </div>
-          <div class="forecast-bar-row">
-            <span class="fb-label down">📉 下落</span>
-            <div class="fb-track"><div class="fb-fill down" id="probDown" style="width:33%"></div></div>
-            <span class="fb-pct" id="probDownTxt">33%</span>
-          </div>
-        </div>
-        <div class="forecast-reason" id="forecastReason">–</div>
-        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
-          ⚠️ 過去のパターンから統計的に算出した参考値です。実際の動きを保証するものではありません。
-        </div>
-      </div>
-    </div>
-
-    <!-- Charts (tabbed) 再開 -->
-    <div class="card">
-      <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('tab-price', this)">価格チャート</button>
-        <button class="tab-btn" onclick="switchTab('tab-rci', this)">RCIチャート</button>
         <button class="tab-btn" onclick="switchTab('tab-macd', this)">MACDチャート</button>
         <button class="tab-btn" onclick="switchTab('tab-signals', this)">シグナル詳細</button>
       </div>
@@ -689,6 +619,73 @@
       <!-- Tab: Signals -->
       <div class="tab-pane" id="tab-signals">
         <ul class="signal-list" id="signalList"></ul>
+      </div>
+    </div>
+
+    <!-- 🎯 売買ライン目安カード -->
+    <div class="card" id="tradePlanCard" style="display:none;">
+      <div class="card-header"><i class="fa-solid fa-crosshairs"></i> 売買ライン目安</div>
+      <div class="card-body">
+        <div class="trade-grid">
+          <div class="trade-row entry">
+            <div class="trade-label">🟢 買いエントリー目安</div>
+            <div class="trade-val" id="entryPrice">–</div>
+            <div class="trade-note" id="entryNote">–</div>
+          </div>
+          <div class="trade-row stop">
+            <div class="trade-label">🔴 損切りライン</div>
+            <div class="trade-val" id="stopPrice">–</div>
+            <div class="trade-note" id="stopNote">–</div>
+          </div>
+          <div class="trade-row tp1">
+            <div class="trade-label">🎯 利確①（MA25・中心線）</div>
+            <div class="trade-val" id="tp1Price">–</div>
+            <div class="trade-note" id="tp1Note">–</div>
+          </div>
+          <div class="trade-row tp2">
+            <div class="trade-label">🚀 利確②（+2σ上限）</div>
+            <div class="trade-val" id="tp2Price">–</div>
+            <div class="trade-note" id="tp2Note">–</div>
+          </div>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:10px; padding:8px 10px; background:rgba(255,255,255,0.03); border-radius:8px;">
+          ⚠️ テクニカル分析に基づく参考値です。投資判断は自己責任でお願いします。
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔮 明日の動き予想カード -->
+    <div class="card" id="forecastCard" style="display:none;">
+      <div class="card-header"><i class="fa-solid fa-wand-magic-sparkles"></i> 明日の動き予想</div>
+      <div class="card-body">
+        <div class="forecast-main">
+          <div class="forecast-icon" id="forecastIcon">–</div>
+          <div>
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:2px;">総合判断</div>
+            <div class="forecast-label" id="forecastLabel">–</div>
+          </div>
+        </div>
+        <div class="forecast-bars">
+          <div class="forecast-bar-row">
+            <span class="fb-label">📈 上昇</span>
+            <div class="fb-track"><div class="fb-fill up" id="probUp" style="width:33%"></div></div>
+            <span class="fb-pct" id="probUpTxt">33%</span>
+          </div>
+          <div class="forecast-bar-row">
+            <span class="fb-label">➡️ 横ばい</span>
+            <div class="fb-track"><div class="fb-fill flat" id="probFlat" style="width:34%"></div></div>
+            <span class="fb-pct" id="probFlatTxt">34%</span>
+          </div>
+          <div class="forecast-bar-row">
+            <span class="fb-label">📉 下落</span>
+            <div class="fb-track"><div class="fb-fill down" id="probDown" style="width:33%"></div></div>
+            <span class="fb-pct" id="probDownTxt">33%</span>
+          </div>
+        </div>
+        <div class="forecast-reason" id="forecastReason">–</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.03); border-radius:8px;">
+          ⚠️ 過去パターンの統計的参考値です。実際の動きを保証するものではありません。
+        </div>
       </div>
     </div>
 
