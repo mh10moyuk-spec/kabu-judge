@@ -267,7 +267,7 @@
 
     /* ─── Chart ─── */
     .chart-wrap { position: relative; }
-    .chart-container { position: relative; height: 220px; }
+    .chart-container { position: relative; height: 280px; }
     .chart-container-rci { position: relative; height: 140px; }
 
     /* ─── Signal List ─── */
@@ -407,7 +407,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.2 - 予想ドーナツチャート</p>
+<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🕯️ v5.5 - ローソク足チャート対応</p>
 </header>
 
 <main>
@@ -721,23 +721,30 @@ function withTimeout(promise, ms) {
   ]);
 }
 
-// CSV形式のStooqデータをパース
+// CSV形式のStooqデータをパース（OHLC対応）
 function parseStooqCSV(text, code) {
   const lines = text.trim().split('\n').filter(l => l && !l.toLowerCase().startsWith('date'));
   if (lines.length < 3) throw new Error('データ行が少なすぎます');
   const rows = lines.slice(-50).reverse().slice(0, 40);
   const pairs = rows.map(line => {
     const cols = line.split(',');
+    if (cols.length < 5) return null;
     const close = parseFloat(cols[4]);
     if (isNaN(close) || close <= 0) return null;
+    const open  = parseFloat(cols[1]) || close;
+    const high  = parseFloat(cols[2]) || close;
+    const low   = parseFloat(cols[3]) || close;
     const dateStr = cols[0]; // YYYY-MM-DD
     const parts = dateStr.split('-');
     const label = parts.length === 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : dateStr;
-    return { close, label };
+    return { open, high, low, close, label };
   }).filter(Boolean);
   if (pairs.length < 3) throw new Error('有効な終値が不足');
   return {
     prices: pairs.map(p => p.close),
+    opens:  pairs.map(p => p.open),
+    highs:  pairs.map(p => p.high),
+    lows:   pairs.map(p => p.low),
     dates:  pairs.map(p => p.label),
     name:   code.replace(/\.[a-zA-Z]+$/, '')
   };
@@ -754,6 +761,9 @@ async function tryCFWorkerStooq(code) {
   if (!data.prices || data.prices.length < 3) throw new Error('Workerデータ不足');
   return {
     prices: data.prices,
+    opens:  data.opens  || data.prices,
+    highs:  data.highs  || data.prices,
+    lows:   data.lows   || data.prices,
     dates:  data.dates || [],
     name:   pure
   };
@@ -950,7 +960,7 @@ async function fetchAndAnalyze() {
   loadMsg.textContent = '株価データを自動取得中...';
 
   try {
-    const { prices, dates, name, source } = await fetchPrices(raw);
+    const { prices, opens, highs, lows, dates, name, source } = await fetchPrices(raw);
     buildPriceGrid(prices, dates);
     statusEl.innerHTML =
       `<i class="fa-solid fa-circle-check" style="color:var(--green)"></i> ` +
@@ -959,7 +969,7 @@ async function fetchAndAnalyze() {
     loadMsg.textContent = 'テクニカル指標を計算中...';
     setTimeout(() => {
       document.getElementById('loading').style.display = 'none';
-      runAnalysis(prices);
+      runAnalysis(prices, opens, highs, lows, dates);
       document.getElementById('result').style.display = 'block';
       document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 300);
@@ -981,7 +991,7 @@ async function fetchAndAnalyze() {
       loadMsg.textContent = 'プリセットデータで分析中...';
       setTimeout(() => {
         document.getElementById('loading').style.display = 'none';
-        runAnalysis(preset.prices);
+        runAnalysis(preset.prices, preset.opens||preset.prices, preset.highs||preset.prices, preset.lows||preset.prices, []);
         document.getElementById('result').style.display = 'block';
         document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 300);
@@ -1314,7 +1324,11 @@ function analyzeStock() {}
 
 
 
-function runAnalysis(prices) {
+function runAnalysis(prices, opens, highs, lows, dates) {
+  opens = opens || prices;
+  highs = highs || prices;
+  lows  = lows  || prices;
+  dates = dates || [];
   const bb = calcBB(prices, Math.min(20, prices.length));
   const rciShort  = calcRCI(prices, Math.min(9, prices.length));
   const rciLong   = prices.length >= 26 ? calcRCI(prices, 26) : null;
@@ -1471,62 +1485,11 @@ function runAnalysis(prices) {
     ul.appendChild(li);
   });
 
-  // ─── Price chart ───
-  const labels = prices.map((_, i) => i === 0 ? '今日' : `${i}日前`).reverse();
-  const pricesRev = [...prices].reverse();
-  const bbMids = [], bbU1 = [], bbL1 = [], bbU2 = [], bbL2 = [];
-  for (let i = 0; i < pricesRev.length; i++) {
-    const sliceFromEnd = pricesRev.slice(Math.max(0, i - 19), i + 1).reverse();
-    if (sliceFromEnd.length >= 5) {
-      const tbb = calcBB(sliceFromEnd, sliceFromEnd.length);
-      bbMids.push(tbb.mid);
-      bbU1.push(tbb.upper1);
-      bbL1.push(tbb.lower1);
-      bbU2.push(tbb.upper2);
-      bbL2.push(tbb.lower2);
-    } else {
-      bbMids.push(null); bbU1.push(null); bbL1.push(null); bbU2.push(null); bbL2.push(null);
-    }
-  }
-
-  if (priceChartInst) priceChartInst.destroy();
-  const pCtx = document.getElementById('priceChart').getContext('2d');
-  priceChartInst = new Chart(pCtx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label: '+2σ', data: bbU2, borderColor: 'rgba(239,68,68,0.5)', borderDash:[4,4], borderWidth:1, pointRadius:0, fill:false },
-        { label: '+1σ', data: bbU1, borderColor: 'rgba(245,158,11,0.5)', borderDash:[2,4], borderWidth:1, pointRadius:0, fill:false },
-        { label: '中心線', data: bbMids, borderColor: 'rgba(99,102,241,0.8)', borderWidth:1.5, pointRadius:0, fill:false },
-        { label: '-1σ', data: bbL1, borderColor: 'rgba(245,158,11,0.5)', borderDash:[2,4], borderWidth:1, pointRadius:0, fill:false },
-        { label: '-2σ', data: bbL2, borderColor: 'rgba(34,197,94,0.6)', borderDash:[4,4], borderWidth:1, pointRadius:0, fill:false },
-        {
-          label: '終値',
-          data: pricesRev,
-          borderColor: '#f1f5f9',
-          backgroundColor: 'rgba(241,245,249,0.08)',
-          borderWidth: 2,
-          pointRadius: 2.5,
-          pointBackgroundColor: '#818cf8',
-          tension: 0.3,
-          fill: true
-        },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 20 } } },
-      scales: {
-        x: { ticks: { color: '#64748b', font: { size: 9 }, maxTicksLimit: 7 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
-      }
-    }
+  // ─── Price chart (ローソク足 + BB + MA5 + MA25) ───
+  drawCandleChart({
+    canvasId: 'priceChart',
+    prices, opens, highs, lows, dates
   });
-
-  // ─── Price chart with MA25 overlay ───
-  // NOTE: MA25 is added to priceChart after creation (see below)
 
   // ─── RCI chart ───
   const rciShortSeries = calcRCISeries(prices, Math.min(9, prices.length)).reverse();
@@ -1585,22 +1548,6 @@ function runAnalysis(prices) {
       }
     }
   });
-
-  // ─── Add MA25 to price chart ───
-  const ma25Series = calcMASeries(prices, 25);          // newest→oldest
-  const ma25Rev    = [...ma25Series].reverse();          // oldest→newest
-  if (priceChartInst && ma25Rev.some(v => v !== null)) {
-    priceChartInst.data.datasets.push({
-      label: 'MA25',
-      data: ma25Rev,
-      borderColor: 'rgba(251,191,36,0.9)',
-      borderWidth: 1.5,
-      borderDash: [4, 3],
-      pointRadius: 0,
-      fill: false
-    });
-    priceChartInst.update('none');
-  }
 
   // ─── MACD chart ───
   let macdLineData = [], sigLineData = [], histData = [], histColors = [];
@@ -1818,6 +1765,210 @@ function calcForecast(bb, rciShort, rciLong, macd, prices) {
     reasons.length ? reasons.join('　/　') : '判断材料が不足しています';
 }
 
+// ─────────────────────────────────────────────────────────
+// ローソク足チャート描画（Canvas 2D API直接描画）
+// BB帯（±1σ薄緑、±2σ薄赤）+ MA5（水色）+ MA25（黄点線）オーバーレイ
+// ─────────────────────────────────────────────────────────
+function drawCandleChart({ canvasId, prices, opens, highs, lows, dates }) {
+  window._lastCandleArgs = { canvasId, prices, opens, highs, lows, dates };
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  // 表示件数：最大40本
+  const n = Math.min(prices.length, 40);
+  // データを古い順（左→右）に並べる（prices[0]=最新）
+  const c = prices.slice(0, n).reverse();
+  // OHLCがない場合は擬似OHLCを生成（高値+0.5%, 安値-0.5%, 始値=前日終値）
+  const hasOHLC = opens && opens !== prices && opens.length >= n;
+  const o = hasOHLC ? opens.slice(0, n).reverse()  : c.map((v, i) => i > 0 ? c[i-1] : v);
+  const h = hasOHLC ? highs.slice(0, n).reverse()  : c.map(v => v * 1.005);
+  const l = hasOHLC ? lows.slice(0, n).reverse()   : c.map(v => v * 0.995);
+  const d = (dates  || []).slice(0, n).reverse();
+
+  // BB（20期間）を古い順に計算
+  const bbMid=[], bbU1=[], bbL1=[], bbU2=[], bbL2=[];
+  for (let i = 0; i < n; i++) {
+    const slice = c.slice(Math.max(0, i-19), i+1).reverse();
+    if (slice.length >= 5) {
+      const m = slice.reduce((a,v)=>a+v,0)/slice.length;
+      const sd = Math.sqrt(slice.reduce((a,v)=>a+(v-m)**2,0)/slice.length);
+      bbMid.push(m);
+      bbU1.push(m+sd);   bbL1.push(m-sd);
+      bbU2.push(m+2*sd); bbL2.push(m-2*sd);
+    } else {
+      bbMid.push(null); bbU1.push(null); bbL1.push(null); bbU2.push(null); bbL2.push(null);
+    }
+  }
+
+  // MA5 / MA25
+  function calcMAArr(arr, period) {
+    return arr.map((_, i) => {
+      if (i < period-1) return null;
+      return arr.slice(i-period+1, i+1).reduce((a,v)=>a+v,0)/period;
+    });
+  }
+  const ma5  = calcMAArr(c, 5);
+  const ma25 = calcMAArr(c, 25);
+
+  // Canvasサイズ設定（DPR対応）
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 340;
+  const H = canvas.parentElement ? (canvas.parentElement.offsetHeight || 280) : 280;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // パディング
+  const PAD_L = 46, PAD_R = 12, PAD_T = 16, PAD_B = 36;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
+  // 価格レンジ
+  const allVals = [...h, ...l, ...bbU2.filter(Boolean), ...bbL2.filter(Boolean)].filter(v=>v!=null);
+  const minP = Math.min(...allVals);
+  const maxP = Math.max(...allVals);
+  const range = maxP - minP || 1;
+  const pad = range * 0.08;
+  const lo = minP - pad, hi = maxP + pad;
+  const toY = v => PAD_T + (1 - (v - lo) / (hi - lo)) * chartH;
+
+  // X座標（中心）
+  const barW = Math.max(3, Math.floor(chartW / n * 0.7));
+  const step = chartW / n;
+  const toX  = i => PAD_L + step * i + step * 0.5;
+
+  // 背景
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(0, 0, W, H);
+
+  // グリッド線（Y軸）
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  const gridCount = 5;
+  for (let g = 0; g <= gridCount; g++) {
+    const yv = lo + (hi - lo) * g / gridCount;
+    const yp = toY(yv);
+    ctx.beginPath(); ctx.moveTo(PAD_L, yp); ctx.lineTo(W - PAD_R, yp); ctx.stroke();
+    // Y軸ラベル
+    ctx.fillStyle = '#64748b';
+    ctx.font = `${9 * dpr / dpr}px sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(yv).toLocaleString(), PAD_L - 4, yp + 4);
+  }
+
+  // BB帯（±2σ→±1σ の順に塗る）
+  function drawBBFill(upper, lower, color) {
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      if (upper[i] == null) continue;
+      const x = toX(i), y = toY(upper[i]);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    for (let i = n-1; i >= 0; i--) {
+      if (lower[i] == null) continue;
+      ctx.lineTo(toX(i), toY(lower[i]));
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  drawBBFill(bbU2, bbL2, 'rgba(239,68,68,0.07)');
+  drawBBFill(bbU1, bbL1, 'rgba(34,197,94,0.09)');
+
+  // BB線
+  function drawLine(data, color, dash, lw) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw || 1;
+    ctx.setLineDash(dash || []);
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      if (data[i] == null) continue;
+      const x = toX(i), y = toY(data[i]);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  drawLine(bbU2,  'rgba(239,68,68,0.55)',   [4,4], 1);
+  drawLine(bbU1,  'rgba(239,68,68,0.3)',    [2,4], 1);
+  drawLine(bbMid, 'rgba(99,102,241,0.7)',   [],    1.5);
+  drawLine(bbL1,  'rgba(34,197,94,0.3)',    [2,4], 1);
+  drawLine(bbL2,  'rgba(34,197,94,0.55)',   [4,4], 1);
+
+  // MA5（水色）
+  drawLine(ma5,  'rgba(56,189,248,0.9)',  [], 1.5);
+  // MA25（黄点線）
+  drawLine(ma25, 'rgba(251,191,36,0.9)',  [5,3], 2);
+
+  // ローソク足
+  for (let i = 0; i < n; i++) {
+    const xc = toX(i);
+    const yO = toY(o[i]), yC = toY(c[i]), yH = toY(h[i]), yL = toY(l[i]);
+    const isUp = c[i] >= o[i];
+    const bodyTop = Math.min(yO, yC);
+    const bodyBot = Math.max(yO, yC);
+    const bodyH   = Math.max(1, bodyBot - bodyTop);
+
+    // ヒゲ（wick）
+    ctx.strokeStyle = isUp ? '#22c55e' : '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xc, yH); ctx.lineTo(xc, bodyTop);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(xc, bodyBot); ctx.lineTo(xc, yL);  ctx.stroke();
+
+    // 実体
+    if (isUp) {
+      ctx.fillStyle = '#22c55e';
+      ctx.strokeStyle = '#22c55e';
+    } else {
+      ctx.fillStyle = '#ef4444';
+      ctx.strokeStyle = '#ef4444';
+    }
+    ctx.lineWidth = 1;
+    ctx.fillRect(xc - barW/2, bodyTop, barW, bodyH);
+  }
+
+  // X軸ラベル（最大8本）
+  ctx.fillStyle = '#64748b';
+  ctx.font = `9px sans-serif`;
+  ctx.textAlign = 'center';
+  const labelStep = Math.max(1, Math.floor(n / 8));
+  for (let i = 0; i < n; i += labelStep) {
+    const lbl = d[i] || (i === n-1 ? '今日' : `${n-1-i}日前`);
+    ctx.fillText(lbl, toX(i), H - 6);
+  }
+  // 一番右（最新）は必ず「今日」
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `bold 9px sans-serif`;
+  ctx.fillText('今日', toX(n-1), H - 6);
+
+  // 凡例（右上）
+  const legends = [
+    { color: '#22c55e', label: '陽線' },
+    { color: '#ef4444', label: '陰線' },
+    { color: 'rgba(56,189,248,0.9)',   label: 'MA5' },
+    { color: 'rgba(251,191,36,0.9)',   label: 'MA25' },
+    { color: 'rgba(99,102,241,0.8)',   label: 'BB中心' },
+    { color: 'rgba(239,68,68,0.6)',    label: '±2σ' },
+  ];
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  legends.forEach((lg, idx) => {
+    const lx = PAD_L + idx * 52;
+    const ly = PAD_T - 4;
+    if (lx + 48 > W) return;
+    ctx.fillStyle = lg.color;
+    ctx.fillRect(lx, ly - 6, 10, 6);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(lg.label, lx + 13, ly);
+  });
+}
+
 function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1825,7 +1976,10 @@ function switchTab(tabId, btn) {
   btn.classList.add('active');
 
   // resize charts on tab switch
-  if (tabId === 'tab-price' && priceChartInst) priceChartInst.resize();
+  if (tabId === 'tab-price') {
+    // ローソク足はCanvasなので再描画トリガー（lastCandleArgs があれば再描画）
+    if (window._lastCandleArgs) drawCandleChart(window._lastCandleArgs);
+  }
   if (tabId === 'tab-rci'   && rciChartInst)   rciChartInst.resize();
   if (tabId === 'tab-macd'  && macdChartInst)  macdChartInst.resize();
 }
