@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ファイルダウンロード</title>
+  <style>
+    body {
+      background: #0f172a; color: #f1f5f9;
+      font-family: 'Helvetica Neue', sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 100vh; margin: 0; padding: 20px;
+      box-sizing: border-box;
+    }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p  { font-size: 13px; color: #94a3b8; margin-bottom: 32px; text-align: center; }
+    .btn {
+      display: block; width: 100%; max-width: 320px;
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      border: none; border-radius: 12px;
+      padding: 16px; color: #fff;
+      font-size: 16px; font-weight: 700;
+      text-align: center; text-decoration: none;
+      margin-bottom: 12px; cursor: pointer;
+      box-sizing: border-box;
+    }
+    .sub { font-size: 11px; color: #64748b; margin-top: 24px; text-align: center; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <h1>📁 ファイルダウンロード</h1>
+  <p>3つのファイルをダウンロードして<br>GitHubにアップロードしてください</p>
+
+  <a class="btn" id="dl1" download="index.html">⬇️ index.html をダウンロード</a>
+  <a class="btn" id="dl2" download="manifest.json">⬇️ manifest.json をダウンロード</a>
+  <a class="btn" id="dl3" download="sw.js">⬇️ sw.js をダウンロード</a>
+
+  <div class="sub">
+    ダウンロード後、GitHubの<br>
+    リポジトリにこの3ファイルを<br>
+    アップロードしてください
+  </div>
+
+  <script>
+    // 各ファイルをfetchしてBlobダウンロードリンクに変換
+    async function makeDownload(id, path, filename) {
+      try {
+        const r = await fetch(path);
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.getElementById(id);
+        a.href = url;
+      } catch(e) {
+        document.getElementById(id).textContent = '⚠️ ' + filename + ' 取得失敗';
+      }
+    }
+    makeDownload('dl1', './index.html',    'index.html');
+    makeDownload('dl2', './manifest.json', 'manifest.json');
+    makeDownload('dl3', './sw.js',         'sw.js');
+  </script>
+</body>
+</html>

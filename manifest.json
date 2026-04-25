@@ -1,0 +1,22 @@
+{
+  "name": "株式テクニカル判定ツール",
+  "short_name": "株判定",
+  "description": "ボリンジャーバンドとRCIで日本株をテクニカル分析するPWAツール",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
