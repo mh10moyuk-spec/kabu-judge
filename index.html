@@ -397,8 +397,7 @@
 
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
-  <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#22c55e; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">✅ v2.5 - Worker+Stooq対応</p>
+  <p>ボリンジャーバンド × RCI で判定 | Yahoo Finance から株価を自動取得</p>
 </header>
 
 <main>
@@ -606,18 +605,19 @@
 
 <script>
 // ══════════════════════════════════════════════════════════════
-//  株価自動取得 — 5段階フォールバック方式（使える回数が多い順）
-//  ① Cloudflare Worker → Stooq CSV（無制限・最優先）
-//  ② Stooq直接（CORS環境のみ・無制限）
-//  ③ allorigins.win → Stooq（無制限）
-//  ④ Twelvedata（800回/日）
-//  ⑤ Alpha Vantage（25回/日）
+//  株価自動取得 — 6段階フォールバック方式
+//  ① Cloudflare Worker → Yahoo Finance（全銘柄対応・最優先）
+//  ② Twelvedata（exchange=JPX / symbol_search補完）
+//  ③ Alpha Vantage（symbol=7203.T 形式、CORS完全対応）
+//  ④ Stooq直接 (CORS対応)
+//  ⑤ allorigins.win → Stooq
+//  ⑥ corsproxy.io → Yahoo Finance v8
 // ══════════════════════════════════════════════════════════════
 
 const TWELVEDATA_KEY   = '1fe3e8dc756f4c13a4b2e0e2bab361e8';
 const ALPHAVANTAGE_KEY = 'WLTMIFFR3K49VBF5';
-const CF_WORKER_URL    = 'https://kabu-proxy.mh10moyuk.workers.dev';
-const FETCH_TIMEOUT    = 15000; // 15秒タイムアウト
+const CF_WORKER_URL    = 'https://kabu-proxy.mh10moyuk.workers.dev/';
+const FETCH_TIMEOUT    = 12000; // 12秒タイムアウト
 
 function withTimeout(promise, ms) {
   return Promise.race([
@@ -648,30 +648,49 @@ function parseStooqCSV(text, code) {
   };
 }
 
-// ① Cloudflare Worker → Stooq CSV（最優先・全銘柄対応・無制限）
-async function tryCFWorkerStooq(code) {
+// ① Cloudflare Worker → Yahoo Finance（全銘柄・名証・東証・大証対応）
+async function tryCFWorkerYahoo(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
-  const workerUrl = `${CF_WORKER_URL}/?code=${encodeURIComponent(pure)}`;
-  const res = await withTimeout(fetch(workerUrl, { cache: 'no-store' }), FETCH_TIMEOUT);
-  if (!res.ok) throw new Error(`Worker HTTP ${res.status}`);
-  const data = await res.json();
-  if (!data.success) throw new Error(data.message || 'Worker取得失敗');
-  if (!data.prices || data.prices.length < 3) throw new Error('Workerデータ不足');
-  return {
-    prices: data.prices,
-    dates:  data.dates || [],
-    name:   pure
-  };
+  // 東証→名証→大証→札証の順で試す
+  const suffixes = ['.T', '.N', '.O', '.S'];
+  for (const suffix of suffixes) {
+    try {
+      const ticker = pure + suffix;
+      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=3mo`;
+      const proxyUrl = `${CF_WORKER_URL}?url=${encodeURIComponent(yahooUrl)}`;
+      const res = await withTimeout(fetch(proxyUrl, { cache: 'no-store' }), FETCH_TIMEOUT);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const result = data?.chart?.result?.[0];
+      if (!result) continue;
+      const closes = result.indicators?.quote?.[0]?.close;
+      const timestamps = result.timestamp;
+      if (!closes || !timestamps || closes.length < 3) continue;
+      const pairs = timestamps
+        .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
+        .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
+        .slice(-20).reverse();
+      if (pairs.length < 3) continue;
+      const name = result.meta?.longName || result.meta?.shortName || ticker;
+      return {
+        prices: pairs.map(p => p.close),
+        dates:  pairs.map(p => `${p.date.getMonth()+1}/${p.date.getDate()}`),
+        name
+      };
+    } catch(e) { /* 次を試す */ }
+  }
+  throw new Error('CFWorker→Yahoo: 全サフィックス失敗');
 }
 
-// ② Stooq 直接（CORS環境のみ・無制限）
+// ② Stooq 直接（CORSヘッダーあり環境なら通る）— .jp / .nj（名証）を試す
 async function tryStooqDirect(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
-  const suffixes = ['.jp', '.nj', '.oj', '.fj'];
+  // 東証→名証→大証の順で試す
+  const suffixes = ['.jp', '.nj', '.fj'];
   for (const suffix of suffixes) {
     try {
       const url = `https://stooq.com/q/d/l/?s=${pure}${suffix}&i=d`;
-      const res = await withTimeout(fetch(url, { cache: 'no-store', mode: 'cors' }), 8000);
+      const res = await withTimeout(fetch(url, { cache: 'no-store', mode: 'cors' }), FETCH_TIMEOUT);
       if (!res.ok) continue;
       const text = await res.text();
       if (text.includes('<html') || text.length < 30) continue;
@@ -681,15 +700,15 @@ async function tryStooqDirect(code) {
   throw new Error('Stooq直接: 全サフィックス失敗');
 }
 
-// ③ allorigins.win → Stooq（無制限）
+// ② allorigins.win → Stooq（.jp / .nj を試す）
 async function tryAlloriginsStooq(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
-  const suffixes = ['.jp', '.nj', '.oj', '.fj'];
+  const suffixes = ['.jp', '.nj', '.fj'];
   for (const suffix of suffixes) {
     try {
       const target = `https://stooq.com/q/d/l/?s=${pure}${suffix}&i=d`;
       const url = `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`;
-      const res = await withTimeout(fetch(url, { cache: 'no-store' }), 10000);
+      const res = await withTimeout(fetch(url, { cache: 'no-store' }), FETCH_TIMEOUT);
       if (!res.ok) continue;
       const json = await res.json();
       const text = json.contents;
@@ -698,6 +717,31 @@ async function tryAlloriginsStooq(code) {
     } catch(e) { /* 次を試す */ }
   }
   throw new Error('AllOrigins→Stooq: 全サフィックス失敗');
+}
+
+// ③ corsproxy.io → Yahoo Finance Chart API
+async function tryCorsproxyYahoo(code) {
+  const ticker = code.includes('.') ? code.toUpperCase() : code.toUpperCase() + '.T';
+  const yUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2mo&events=history`;
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yUrl)}`;
+  const res = await withTimeout(fetch(proxyUrl, { cache: 'no-store' }), FETCH_TIMEOUT);
+  if (!res.ok) throw new Error(`corsproxy HTTP ${res.status}`);
+  const data = await res.json();
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error('Yahooチャートデータなし');
+  const closes = result.indicators?.quote?.[0]?.close;
+  const timestamps = result.timestamp;
+  if (!closes || !timestamps) throw new Error('Yahoo終値データなし');
+  const pairs = timestamps
+    .map((t, i) => ({ date: new Date(t * 1000), close: closes[i] }))
+    .filter(p => p.close != null && !isNaN(p.close) && p.close > 0)
+    .slice(-20).reverse();
+  if (pairs.length < 3) throw new Error('Yahoo有効データ不足');
+  return {
+    prices: pairs.map(p => p.close),
+    dates:  pairs.map(p => `${p.date.getMonth()+1}/${p.date.getDate()}`),
+    name:   ticker
+  };
 }
 
 // Twelvedataのレスポンスをパースして返す共通関数
@@ -720,7 +764,7 @@ function parseTwelvedataResponse(data, name) {
   };
 }
 
-// ④ Twelvedata（800回/日）
+// ① Twelvedata — symbol_searchで正しいシンボルを特定してから取得
 async function tryTwelvedata(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
 
@@ -764,7 +808,7 @@ async function tryTwelvedata(code) {
   throw new Error('Twelvedata: 取得失敗');
 }
 
-// Alpha Vantageのレスポンスをパース
+// Alpha Vantageのレスポンスをパースする共通関数
 function parseAlphaVantageResponse(data, symbol) {
   if (data['Error Message']) throw new Error(`AlphaVantage: ${data['Error Message']}`);
   if (data['Note']) throw new Error('AlphaVantage: APIレート制限');
@@ -787,7 +831,7 @@ function parseAlphaVantageResponse(data, symbol) {
   return { prices, dates, name: symbol };
 }
 
-// ⑤ Alpha Vantage（25回/日）
+// ② Alpha Vantage — 東証(.T) / 名証(.N) / 大証(.O) を順に試す
 async function tryAlphaVantage(code) {
   const pure = code.replace(/\.[a-zA-Z]+$/, '');
   // 東証→名証→大証→プレフィックスなし の順で試す
@@ -813,15 +857,16 @@ async function tryAlphaVantage(code) {
   throw new Error('AlphaVantage: 全シンボル取得失敗');
 }
 
-// メイン取得関数: Worker→Stooq直接→AllOrigins→Twelvedata→AlphaVantage の5段階
+// メイン取得関数: Twelvedata → AlphaVantage → Stooq → AllOrigins → Corsproxy の5段階
 async function fetchPrices(code) {
   const loadMsg = document.getElementById('loadingMsg');
   const funcs = [
-    { name: 'Worker→Stooq',    fn: tryCFWorkerStooq   },
-    { name: 'Stooq直接',        fn: tryStooqDirect     },
-    { name: 'AllOrigins→Stooq', fn: tryAlloriginsStooq },
-    { name: 'Twelvedata',       fn: tryTwelvedata      },
-    { name: 'Alpha Vantage',    fn: tryAlphaVantage    },
+    { name: 'Yahoo(自動取得)', fn: tryCFWorkerYahoo   },
+    { name: 'Twelvedata',      fn: tryTwelvedata      },
+    { name: 'Alpha Vantage',   fn: tryAlphaVantage    },
+    { name: 'Stooq直接',       fn: tryStooqDirect     },
+    { name: 'AllOrigins→Stooq',fn: tryAlloriginsStooq },
+    { name: 'Corsproxy→Yahoo', fn: tryCorsproxyYahoo  },
   ];
   const errs = [];
   for (const { name, fn } of funcs) {
@@ -1434,5 +1479,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-</body>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script></body>
 </html>
