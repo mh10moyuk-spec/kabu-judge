@@ -192,29 +192,6 @@
     .btn-analyze:hover { opacity: 0.88; }
     .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ─── Price Input ─── */
-    .price-area {
-      margin-top: 10px;
-    }
-    .price-area label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: block; }
-    .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .price-input {
-      background: var(--bg-card2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      color: var(--text);
-      font-size: 13px;
-      font-family: inherit;
-      outline: none;
-      width: 100%;
-      text-align: center;
-      transition: border-color 0.18s;
-    }
-    .price-input:focus { border-color: var(--accent); }
-    .price-input::placeholder { color: var(--text-muted); font-size: 11px; }
-    .price-label { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 2px; }
-
     /* ─── Loading ─── */
     .loading {
       text-align: center; padding: 30px;
@@ -424,7 +401,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.0 - 売買ライン・明日予想追加</p>
+<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.1 - 手動入力廃止・UI整理</p>
 </header>
 
 <main>
@@ -462,11 +439,7 @@
           <div class="name">ベルーナ</div>
           <div class="theme">PBR 0.56・割安</div>
         </button>
-        <button class="preset-btn" data-code="custom" onclick="clearPreset(this)">
-          <div class="code">カスタム</div>
-          <div class="name">手動入力</div>
-          <div class="theme">任意の株価を入力</div>
-        </button>
+
       </div>
 
       <!-- Ticker + Fetch button -->
@@ -479,18 +452,9 @@
       </div>
 
       <!-- Fetch status -->
-      <div id="fetchStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:10px; min-height:18px; line-height:1.6;"></div>
-
-      <!-- Price input grid: 20 days (editable / auto-filled) -->
-      <div class="price-area">
-        <label style="margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
-          <span><i class="fa-solid fa-table"></i> 過去40日の終値（自動取得 または 手動入力）</span>
-          <button onclick="analyzeStock()" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;color:var(--text-muted);font-size:11px;cursor:pointer;font-family:inherit;">
-            <i class="fa-solid fa-bolt"></i> 手動分析
-          </button>
-        </label>
-        <div id="priceGrid" class="price-grid"></div>
-      </div>
+      <div id="fetchStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:4px; min-height:18px; line-height:1.6;"></div>
+      <!-- 非表示グリッド（JS互換用） -->
+      <div id="priceGrid" style="display:none;"></div>
     </div>
   </section>
 
@@ -1055,24 +1019,9 @@ let rciChartInst = null;
 let macdChartInst = null;
 
 // ─── Build price input grid ───
+// buildPriceGrid: 非表示グリッドにデータを保存（互換用）
 function buildPriceGrid(values = [], dates = []) {
-  const grid = document.getElementById('priceGrid');
-  grid.innerHTML = '';
-  for (let i = 0; i < 40; i++) {
-    const wrap = document.createElement('div');
-    const inp = document.createElement('input');
-    inp.type = 'number';
-    inp.className = 'price-input';
-    inp.id = `p${i}`;
-    inp.placeholder = i === 0 ? '最新終値' : `${i+1}日前`;
-    if (values[i] !== undefined) inp.value = parseFloat(values[i]).toFixed(0);
-    const lbl = document.createElement('div');
-    lbl.className = 'price-label';
-    lbl.textContent = dates[i] ? dates[i] : (i === 0 ? '最新' : `${i+1}日前`);
-    wrap.appendChild(inp);
-    wrap.appendChild(lbl);
-    grid.appendChild(wrap);
-  }
+  // グリッドは非表示。データはrunAnalysisに直接渡すので何もしない
 }
 
 // ─── Load preset ───
@@ -1087,9 +1036,8 @@ function loadPreset(btn) {
 
 function clearPreset(btn) {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
   document.getElementById('tickerInput').value = '';
-  buildPriceGrid([]);
+  document.getElementById('fetchStatus').textContent = '';
 }
 
 // ─── Math helpers ───
@@ -1349,26 +1297,10 @@ function scoreFromIndicators(bb, rciShort, rciLong, prevRciShort, prevRciLong, m
 }
 
 // ─── Analyze ───
-// 手動入力から分析（グリッドに値が入っている場合のフォールバック）
-function analyzeStock() {
-  const prices = [];
-  for (let i = 0; i < 40; i++) {
-    const v = parseFloat(document.getElementById(`p${i}`)?.value);
-    if (!isNaN(v) && v > 0) prices.push(v);
-  }
-  if (prices.length < 9) {
-    alert('最低9日分の株価を入力してください（40日分で全指標が使用可能）。');
-    return;
-  }
-  document.getElementById('loading').style.display = 'block';
-  document.getElementById('result').style.display = 'none';
-  setTimeout(() => {
-    document.getElementById('loading').style.display = 'none';
-    runAnalysis(prices);
-    document.getElementById('result').style.display = 'block';
-    document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 400);
-}
+// （手動入力廃止のため空関数として残す）
+function analyzeStock() {}
+
+
 
 function runAnalysis(prices) {
   const bb = calcBB(prices, Math.min(20, prices.length));
