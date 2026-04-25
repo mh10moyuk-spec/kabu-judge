@@ -329,6 +329,32 @@
       font-size: 10px; color: var(--text-muted); margin-top: 4px;
     }
 
+    /* ─── Trade Plan ─── */
+    .trade-grid { display: flex; flex-direction: column; gap: 8px; }
+    .trade-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; flex-wrap: wrap; }
+    .trade-row.entry { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); }
+    .trade-row.stop  { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.25); }
+    .trade-row.tp1   { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25); }
+    .trade-row.tp2   { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); }
+    .trade-label { font-size: 12px; color: var(--text-muted); min-width: 140px; }
+    .trade-val   { font-size: 18px; font-weight: 700; color: var(--text); min-width: 90px; }
+    .trade-note  { font-size: 11px; color: var(--text-muted); flex: 1; }
+
+    /* ─── Forecast ─── */
+    .forecast-main { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .forecast-icon { font-size: 40px; }
+    .forecast-label { font-size: 20px; font-weight: 700; color: var(--text); }
+    .forecast-bars { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .forecast-bar-row { display: flex; align-items: center; gap: 8px; }
+    .fb-label { font-size: 12px; min-width: 70px; }
+    .fb-track { flex: 1; height: 14px; background: rgba(255,255,255,0.06); border-radius: 7px; overflow: hidden; }
+    .fb-fill  { height: 100%; border-radius: 7px; transition: width 0.6s ease; }
+    .fb-fill.up   { background: linear-gradient(90deg, #22c55e, #4ade80); }
+    .fb-fill.flat { background: linear-gradient(90deg, #6366f1, #818cf8); }
+    .fb-fill.down { background: linear-gradient(90deg, #ef4444, #f87171); }
+    .fb-pct { font-size: 13px; font-weight: 700; min-width: 36px; text-align: right; }
+    .forecast-reason { font-size: 12px; color: var(--text-muted); line-height: 1.6; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 8px; }
+
     /* ─── Tabs ─── */
     .tab-bar {
       display: flex; gap: 4px;
@@ -398,7 +424,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v4.0 - 40日取得・全指標対応</p>
+<p style="font-size:11px; background:#f59e0b; color:#000; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.0 - 売買ライン・明日予想追加</p>
 </header>
 
 <main>
@@ -551,6 +577,76 @@
     </div>
 
     <!-- Charts (tabbed) -->
+    <div class="card">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('tab-price', this)">価格チャート</button>
+        <button class="tab-btn" onclick="switchTab('tab-rci', this)">RCIチャート</button>
+
+    <!-- 🎯 買売ライン・明日予想カード -->
+    <div class="card" id="tradePlanCard" style="display:none;">
+      <div class="card-header"><i class="fa-solid fa-crosshairs"></i> 売買ライン目安</div>
+      <div class="card-body">
+        <div class="trade-grid">
+          <div class="trade-row entry">
+            <div class="trade-label">🟢 買いエントリー目安</div>
+            <div class="trade-val" id="entryPrice">–</div>
+            <div class="trade-note" id="entryNote">–</div>
+          </div>
+          <div class="trade-row stop">
+            <div class="trade-label">🔴 損切りライン</div>
+            <div class="trade-val" id="stopPrice">–</div>
+            <div class="trade-note" id="stopNote">–</div>
+          </div>
+          <div class="trade-row tp1">
+            <div class="trade-label">🎯 利確①（MA25）</div>
+            <div class="trade-val" id="tp1Price">–</div>
+            <div class="trade-note" id="tp1Note">–</div>
+          </div>
+          <div class="trade-row tp2">
+            <div class="trade-label">🚀 利確②（+2σ）</div>
+            <div class="trade-val" id="tp2Price">–</div>
+            <div class="trade-note" id="tp2Note">–</div>
+          </div>
+        </div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius:6px;">
+          ⚠️ これはテクニカル分析に基づく参考値です。投資判断は自己責任でお願いします。
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔮 明日の動き予想カード -->
+    <div class="card" id="forecastCard" style="display:none;">
+      <div class="card-header"><i class="fa-solid fa-wand-magic-sparkles"></i> 明日の動き予想</div>
+      <div class="card-body">
+        <div class="forecast-main">
+          <div class="forecast-icon" id="forecastIcon">–</div>
+          <div class="forecast-label" id="forecastLabel">–</div>
+        </div>
+        <div class="forecast-bars">
+          <div class="forecast-bar-row">
+            <span class="fb-label up">📈 上昇</span>
+            <div class="fb-track"><div class="fb-fill up" id="probUp" style="width:33%"></div></div>
+            <span class="fb-pct" id="probUpTxt">33%</span>
+          </div>
+          <div class="forecast-bar-row">
+            <span class="fb-label flat">➡️ 横ばい</span>
+            <div class="fb-track"><div class="fb-fill flat" id="probFlat" style="width:34%"></div></div>
+            <span class="fb-pct" id="probFlatTxt">34%</span>
+          </div>
+          <div class="forecast-bar-row">
+            <span class="fb-label down">📉 下落</span>
+            <div class="fb-track"><div class="fb-fill down" id="probDown" style="width:33%"></div></div>
+            <span class="fb-pct" id="probDownTxt">33%</span>
+          </div>
+        </div>
+        <div class="forecast-reason" id="forecastReason">–</div>
+        <div style="font-size:10px; color:var(--text-muted); margin-top:8px; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+          ⚠️ 過去のパターンから統計的に算出した参考値です。実際の動きを保証するものではありません。
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts (tabbed) 再開 -->
     <div class="card">
       <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('tab-price', this)">価格チャート</button>
@@ -1631,7 +1727,148 @@ function runAnalysis(prices) {
       }
     }
   });
+
+  // ─── 売買ライン & 明日予想 ───
+  calcTradePlan(bb, ma25, prices);
+  calcForecast(bb, rciShort, rciLong, macd, prices);
 }
+
+// ─── 売買ライン計算 ───
+function calcTradePlan(bb, ma25, prices) {
+  const card = document.getElementById('tradePlanCard');
+  if (!bb) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const cur = prices[0];
+
+  // 買いエントリー目安：-1σ〜-2σの中間
+  const entryVal = (bb.lower1 + bb.lower2) / 2;
+  // 損切りライン：-3σ または直近20日安値の低い方
+  const recentLow = Math.min(...prices.slice(0, Math.min(20, prices.length)));
+  const stopVal   = Math.min(bb.lower3, recentLow);
+  // 利確①：MA25 または BB中心線の高い方
+  const tp1Val = ma25 ? Math.max(ma25, bb.mid) : bb.mid;
+  // 利確②：+2σ
+  const tp2Val = bb.upper2;
+
+  // 現在値からの乖離率
+  const pct = (v) => ((v - cur) / cur * 100).toFixed(1);
+  const fmt = (v) => Math.round(v).toLocaleString() + '円';
+
+  document.getElementById('entryPrice').textContent = fmt(entryVal);
+  document.getElementById('entryNote').textContent  = `現在値比 ${pct(entryVal)}%　(-1σ〜-2σ の中間)`;
+
+  document.getElementById('stopPrice').textContent = fmt(stopVal);
+  document.getElementById('stopNote').textContent  = `現在値比 ${pct(stopVal)}%　(-3σ / 直近安値)`;
+
+  document.getElementById('tp1Price').textContent = fmt(tp1Val);
+  document.getElementById('tp1Note').textContent  = `現在値比 +${pct(tp1Val)}%　(MA25 / 中心線)`;
+
+  document.getElementById('tp2Price').textContent = fmt(tp2Val);
+  document.getElementById('tp2Note').textContent  = `現在値比 +${pct(tp2Val)}%　(+2σ 上限)`;
+}
+
+// ─── 明日の動き予想 ───
+function calcForecast(bb, rciShort, rciLong, macd, prices) {
+  const card = document.getElementById('forecastCard');
+  card.style.display = 'block';
+
+  // スコアベースで上昇・下落・横ばい確率を算出
+  let upScore = 0, downScore = 0;
+
+  // BB
+  if (bb) {
+    const sig = bb.sigmaPos;
+    if (sig <= -2) upScore += 30;
+    else if (sig <= -1) upScore += 15;
+    else if (sig >= 2) downScore += 30;
+    else if (sig >= 1) downScore += 15;
+    // スクイーズ → どちらにも振れやすい
+    const bw = (bb.upper2 - bb.lower2) / bb.mid * 100;
+    if (bw < 3) { upScore += 5; downScore += 5; }
+  }
+
+  // RCI短期
+  if (rciShort !== null) {
+    if (rciShort <= -80) upScore += 25;
+    else if (rciShort <= -50) upScore += 10;
+    else if (rciShort >= 80) downScore += 25;
+    else if (rciShort >= 50) downScore += 10;
+  }
+
+  // RCI長期
+  if (rciLong !== null) {
+    if (rciLong <= -50) upScore += 10;
+    else if (rciLong >= 50) downScore += 10;
+  }
+
+  // MACD ヒストグラム方向
+  if (macd && macd.hist !== null && macd.prevHist !== null) {
+    if (macd.hist > macd.prevHist) upScore += 15;
+    else downScore += 15;
+  }
+
+  // 直近3日の値動き（モメンタム）
+  if (prices.length >= 4) {
+    const mom3 = prices[0] - prices[3];
+    if (mom3 > 0) upScore += 10;
+    else if (mom3 < 0) downScore += 10;
+  }
+
+  // 確率に変換（合計100%）
+  const total = upScore + downScore + 40; // 40を横ばいのベース
+  let probUp   = Math.round(upScore / total * 100);
+  let probDown = Math.round(downScore / total * 100);
+  let probFlat = 100 - probUp - probDown;
+  // 0以下にならないように
+  probFlat = Math.max(5, probFlat);
+  probUp   = Math.max(5, probUp);
+  probDown = Math.max(5, probDown);
+  // 合計を100に正規化
+  const sum = probUp + probFlat + probDown;
+  probUp   = Math.round(probUp / sum * 100);
+  probDown = Math.round(probDown / sum * 100);
+  probFlat = 100 - probUp - probDown;
+
+  // 最大確率の方向
+  let icon, label, labelColor;
+  if (probUp >= probDown && probUp >= probFlat) {
+    icon = '📈'; label = '上昇優勢'; labelColor = 'var(--green)';
+  } else if (probDown >= probUp && probDown >= probFlat) {
+    icon = '📉'; label = '下落優勢'; labelColor = 'var(--red)';
+  } else {
+    icon = '➡️'; label = '横ばい優勢'; labelColor = 'var(--accent2)';
+  }
+
+  document.getElementById('forecastIcon').textContent   = icon;
+  document.getElementById('forecastLabel').textContent  = label;
+  document.getElementById('forecastLabel').style.color  = labelColor;
+
+  document.getElementById('probUp').style.width    = probUp + '%';
+  document.getElementById('probFlat').style.width  = probFlat + '%';
+  document.getElementById('probDown').style.width  = probDown + '%';
+  document.getElementById('probUpTxt').textContent   = probUp + '%';
+  document.getElementById('probFlatTxt').textContent = probFlat + '%';
+  document.getElementById('probDownTxt').textContent = probDown + '%';
+
+  // 理由テキスト
+  const reasons = [];
+  if (bb && bb.sigmaPos <= -1.5) reasons.push('BBが売られすぎ圏（反発期待）');
+  if (bb && bb.sigmaPos >= 1.5)  reasons.push('BBが買われすぎ圏（反落注意）');
+  if (rciShort !== null && rciShort <= -80) reasons.push('RCI短期が-80以下（底値圏）');
+  if (rciShort !== null && rciShort >= 80)  reasons.push('RCI短期が+80以上（過熱圏）');
+  if (macd && macd.hist !== null && macd.prevHist !== null) {
+    if (macd.hist > macd.prevHist) reasons.push('MACDヒストグラムが拡大中（買いモメンタム）');
+    else reasons.push('MACDヒストグラムが縮小中（売りモメンタム）');
+  }
+  if (prices.length >= 4) {
+    const mom = prices[0] - prices[3];
+    reasons.push(`直近3日の値動き: ${mom > 0 ? '+' : ''}${Math.round(mom)}円`);
+  }
+  document.getElementById('forecastReason').textContent =
+    reasons.length ? reasons.join('　/　') : '判断材料が不足しています';
+}
+
 function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1718,5 +1955,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-</body>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script></body>
 </html>
