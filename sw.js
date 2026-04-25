@@ -1,7 +1,17 @@
-const CACHE_NAME = 'kabu-tech-v1';
+const CACHE_NAME = 'kabu-tech-v3';
 const ASSETS = [
   './index.html',
   './manifest.json'
+];
+
+const BYPASS_DOMAINS = [
+  'api.twelvedata.com',
+  'www.alphavantage.co',
+  'stooq.com',
+  'api.allorigins.win',
+  'corsproxy.io',
+  'query1.finance.yahoo.com',
+  'query2.finance.yahoo.com'
 ];
 
 self.addEventListener('install', e => {
@@ -21,6 +31,10 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  if (BYPASS_DOMAINS.some(domain => url.hostname.includes(domain))) {
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
