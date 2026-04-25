@@ -10,12 +10,12 @@ export default {
     try {
       const res = await fetch(target, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+          'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)',
+          'Accept': 'text/html,application/xhtml+xml',
           'Accept-Language': 'ja-JP,ja;q=0.9',
-          'Referer': 'https://finance.yahoo.co.jp/',
+          'Accept-Encoding': 'identity',
         }
       });
-      const contentType = res.headers.get('Content-Type') || 'text/plain';
       const body = await res.text();
       if (mode === 'scrape') {
         const result = scrapeYahooJapanHistory(body);
@@ -24,7 +24,7 @@ export default {
         });
       }
       return new Response(body, {
-        headers: { 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' }
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*' }
       });
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message }), {
@@ -38,7 +38,7 @@ function scrapeYahooJapanHistory(html) {
   try {
     const prices = [], dates = [];
     const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    const stripTags = s => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim();
+    const stripTags = s => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').replace(/\s+/g, '').trim();
     let rowMatch;
     while ((rowMatch = rowPattern.exec(html)) !== null) {
       const rowHtml = rowMatch[1];
@@ -62,7 +62,11 @@ function scrapeYahooJapanHistory(html) {
       }
       if (prices.length >= 20) break;
     }
-    if (prices.length < 3) return { success: false, message: `データ不足(${prices.length}件)` };
+    if (prices.length < 3) {
+      // デバッグ用: HTMLの一部を返す
+      const snippet = html.substring(0, 500);
+      return { success: false, message: `データ不足(${prices.length}件)`, snippet };
+    }
     return { success: true, prices, dates, count: prices.length };
   } catch (e) {
     return { success: false, error: e.message };
