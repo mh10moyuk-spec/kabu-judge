@@ -63,8 +63,7 @@ function scrapeYahooJapanHistory(html) {
       if (prices.length >= 20) break;
     }
     if (prices.length < 3) {
-      // デバッグ用: HTMLの一部を返す
-      const snippet = html.substring(0, 500);
+      const snippet = html.substring(0, 2000);
       return { success: false, message: `データ不足(${prices.length}件)`, snippet };
     }
     return { success: true, prices, dates, count: prices.length };
