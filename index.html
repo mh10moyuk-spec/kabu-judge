@@ -305,19 +305,30 @@
   transition: border-color .18s;
 }
 .wl-item:hover { border-color: var(--accent); }
+.wl-info {
+  flex: 1;
+  min-width: 0;           /* テキスト省略のために必要 */
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 .wl-code {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--accent2);
-  min-width: 60px;
+  letter-spacing: .03em;
 }
 .wl-name {
-  font-size: 12px;
-  color: var(--text-muted);
-  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.wl-date {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 .wl-score {
   font-size: 18px;
@@ -1086,9 +1097,10 @@ function renderWatchlist() {
     const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
     return `
       <div class="wl-item">
-        <div class="wl-code">${w.code}</div>
-        <div class="wl-name" title="${w.name}">${w.name || '–'}<br>
-          <span style="font-size:10px;color:var(--text-muted);">${dateStr}</span>
+        <div class="wl-info">
+          <div class="wl-code">${w.code}</div>
+          <div class="wl-name" title="${w.name || w.code}">${w.name || '–'}</div>
+          <div class="wl-date">${dateStr}</div>
         </div>
         <div class="wl-score" style="color:${scoreColor};">${w.score}</div>
         <div class="wl-verdict ${verdClass}">${w.verdict}</div>
