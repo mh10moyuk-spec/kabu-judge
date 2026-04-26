@@ -292,7 +292,76 @@
     .trade-val   { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
     .trade-note  { font-size: 10px; color: var(--text-muted); line-height: 1.4; }
 
-    /* ─── Forecast ─── */
+    /* ─── Watchlist ─── */
+.wl-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: default;
+  transition: border-color .18s;
+}
+.wl-item:hover { border-color: var(--accent); }
+.wl-code {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent2);
+  min-width: 60px;
+}
+.wl-name {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wl-score {
+  font-size: 18px;
+  font-weight: 800;
+  min-width: 36px;
+  text-align: center;
+}
+.wl-verdict {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wl-verdict.buy  { background: rgba(34,197,94,.18);  color: var(--green); }
+.wl-verdict.hold { background: rgba(234,179,8,.18);  color: var(--yellow); }
+.wl-verdict.sell { background: rgba(239,68,68,.18);  color: var(--red); }
+.wl-analyze-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .18s;
+}
+.wl-analyze-btn:hover { opacity: .8; }
+.wl-del-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 6px;
+  transition: color .18s;
+}
+.wl-del-btn:hover { color: var(--red); }
+
+/* ─── Forecast ─── */
     .forecast-reason { font-size: 12px; color: var(--text-muted); line-height: 1.7; padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 10px; border-left: 3px solid var(--border); }
 
     /* ─── Tabs ─── */
@@ -364,7 +433,7 @@
 <header>
   <h1><i class="fa-solid fa-chart-line" style="color: var(--accent2); margin-right: 8px;"></i>株式テクニカル判定ツール</h1>
   <p>ボリンジャーバンド × RCI で判定 | Stooq から株価を自動取得</p>
-<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">🕯️ v5.8 - 予想チャート視認性改善</p>
+<p style="font-size:11px; background:#0ea5e9; color:#fff; border-radius:6px; padding:2px 10px; display:inline-block; margin-top:4px; font-weight:700;">⭐ v5.9 - ウォッチリスト機能追加</p>
 </header>
 
 <main>
@@ -388,6 +457,17 @@
       <div id="fetchStatus" style="font-size:12px; color:var(--text-muted); margin-bottom:4px; min-height:18px; line-height:1.6;"></div>
       <!-- 非表示グリッド（JS互換用） -->
       <div id="priceGrid" style="display:none;"></div>
+    </div>
+  </section>
+
+  <!-- ─── Watchlist Card ─── -->
+  <section class="card" id="watchlistCard" style="display:none;">
+    <div class="card-header">
+      <i class="fa-solid fa-bookmark"></i> ウォッチリスト
+      <span id="watchlistCount" style="margin-left:8px; font-size:11px; background:var(--accent); color:#fff; border-radius:10px; padding:1px 8px;">0</span>
+    </div>
+    <div class="card-body" style="padding:8px 12px 12px;">
+      <div id="watchlistItems" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
   </section>
 
@@ -457,6 +537,14 @@
             <div class="ind-bar"><div class="ind-bar-fill" id="ma25Bar" style="width:50%; background: var(--yellow);"></div></div>
             <div class="ind-status" id="ma25Status" style="color: var(--text-muted);">–</div>
           </div>
+        </div>
+
+        <!-- ウォッチリスト保存ボタン -->
+        <div style="margin: 8px 0 4px; text-align:center;">
+          <button id="watchlistBtn" onclick="saveToWatchlist()"
+            style="background:var(--accent); color:#fff; border:none; border-radius:20px; padding:8px 24px; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:opacity .2s;">
+            <i class="fa-solid fa-bookmark"></i> ウォッチリストに追加
+          </button>
         </div>
 
         <!-- BB Position bar visualization -->
@@ -924,6 +1012,99 @@ let priceChartInst = null;
 let rciChartInst = null;
 let macdChartInst = null;
 
+// ─── 現在分析中の銘柄情報（保存用）───
+let _currentAnalysis = null;  // { code, name, score, verdict, savedAt }
+
+// ─── ウォッチリスト：localStorage管理 ───
+const WL_KEY = 'kabu_watchlist_v1';
+
+function wlLoad() {
+  try { return JSON.parse(localStorage.getItem(WL_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function wlSave(list) {
+  localStorage.setItem(WL_KEY, JSON.stringify(list));
+}
+
+function saveToWatchlist() {
+  if (!_currentAnalysis) return;
+  const list = wlLoad();
+  // 同じコードがあれば上書き（最新スコアに更新）
+  const idx = list.findIndex(w => w.code === _currentAnalysis.code);
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ..._currentAnalysis, savedAt: Date.now() };
+  } else {
+    list.unshift({ ..._currentAnalysis, savedAt: Date.now() });
+  }
+  wlSave(list);
+  renderWatchlist();
+
+  // ボタンを一時的に「✅ 保存済み」に変える
+  const btn = document.getElementById('watchlistBtn');
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> 保存しました！';
+    btn.style.background = 'var(--green)';
+    setTimeout(() => {
+      btn.innerHTML = '<i class="fa-solid fa-bookmark"></i> ウォッチリストに追加';
+      btn.style.background = '';
+    }, 1800);
+  }
+}
+
+function deleteFromWatchlist(code) {
+  const list = wlLoad().filter(w => w.code !== code);
+  wlSave(list);
+  renderWatchlist();
+}
+
+function analyzeFromWatchlist(code) {
+  document.getElementById('tickerInput').value = code;
+  fetchAndAnalyze();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderWatchlist() {
+  const list = wlLoad();
+  const card  = document.getElementById('watchlistCard');
+  const items = document.getElementById('watchlistItems');
+  const count = document.getElementById('watchlistCount');
+
+  count.textContent = list.length;
+
+  if (list.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+
+  items.innerHTML = list.map(w => {
+    const scoreColor = w.score >= 70 ? 'var(--green)'
+                     : w.score >= 45 ? 'var(--yellow)'
+                     : 'var(--red)';
+    const verdClass  = w.score >= 55 ? 'buy' : w.score >= 45 ? 'hold' : 'sell';
+    const date = new Date(w.savedAt);
+    const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
+    return `
+      <div class="wl-item">
+        <div class="wl-code">${w.code}</div>
+        <div class="wl-name" title="${w.name}">${w.name || '–'}<br>
+          <span style="font-size:10px;color:var(--text-muted);">${dateStr}</span>
+        </div>
+        <div class="wl-score" style="color:${scoreColor};">${w.score}</div>
+        <div class="wl-verdict ${verdClass}">${w.verdict}</div>
+        <button class="wl-analyze-btn" onclick="analyzeFromWatchlist('${w.code}')">
+          <i class="fa-solid fa-rotate-right"></i> 再分析
+        </button>
+        <button class="wl-del-btn" onclick="deleteFromWatchlist('${w.code}')" title="削除">
+          ✕
+        </button>
+      </div>`;
+  }).join('');
+}
+
+// 起動時にウォッチリストを描画
+renderWatchlist();
+
 // ─── Build price input grid ───
 // buildPriceGrid: 非表示グリッドにデータを保存（互換用）
 function buildPriceGrid(values = [], dates = []) {
@@ -1262,6 +1443,22 @@ function runAnalysis(prices, opens, highs, lows, dates) {
     verd.textContent = '🔴 売り候補 / 回避';
     verd.className = 'verdict sell';
     vsub.textContent = '複数の売りシグナルが重なっている。新規買いは避け、保有中は撤退を検討。';
+  }
+
+  // ─── ウォッチリスト用に現在の分析結果を保持 ───
+  {
+    const rawCode = document.getElementById('tickerInput').value.trim();
+    // fetchStatusから銘柄名を取得（取得済みなら表示中）
+    const statusEl = document.getElementById('fetchStatus');
+    const nameMatch = statusEl ? statusEl.innerHTML.match(/<strong>([^<]+)<\/strong>/) : null;
+    const name = nameMatch ? nameMatch[1] : rawCode;
+    _currentAnalysis = {
+      code:    rawCode,
+      name:    name,
+      score:   score,
+      verdict: verd.textContent,
+      price:   Math.round(curPrice),
+    };
   }
 
   // ─── BB indicator cards ───
